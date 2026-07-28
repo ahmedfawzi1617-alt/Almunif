@@ -1,0 +1,17 @@
+{
+  "name": "MMP Egypt — تحليل الإنتاج",
+  "short_name": "MMP Egypt",
+  "description": "لوحة تحليل الإنتاج والهالك والاختبارات المعملية — مصنع المنيف للأنابيب",
+  "start_url": "OVERVIEW.html",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#070f1c",
+  "theme_color": "#0a1628",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
