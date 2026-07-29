@@ -327,11 +327,7 @@
       <div class="value" id="kpiTopCustomer" style="font-size:16px; line-height:1.3;">—</div>
       <div class="sub" id="kpiTopCustomerSub">—</div>
     </div>
-    <div class="kpi k5">
-      <div class="label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>نسبة الهالك</div>
-      <div class="value" id="kpiScrapPct">—</div>
-      <div class="sub" id="kpiScrapPctSub">من إجمالي الإنتاج</div>
-    </div>
+
   </div>
 
   <div class="grid">
@@ -661,10 +657,6 @@ function renderKPIs(data){
   document.getElementById('kpiTotal').textContent = fmtKg(totalKg);
   document.getElementById('kpiTotalSub').textContent = 'كجم في الفترة المحددة';
 
-  const totalScrap = data.reduce((s,r)=>s+(r.scrap_kg||0),0);
-  const scrapPct = totalKg ? (totalScrap/(totalKg+totalScrap)*100) : 0;
-  document.getElementById('kpiScrapPct').textContent = scrapPct.toFixed(2)+'%';
-  document.getElementById('kpiScrapPctSub').textContent = fmtKg(totalScrap) + ' كجم هالك';
 
   const orders = new Set(data.map(r=>r.order_no).filter(Boolean));
   document.getElementById('kpiOrders').textContent = orders.size;
