@@ -695,7 +695,10 @@ function renderMaterial(data){
 }
 
 function renderTable(data){
-  const sorted = [...data].sort((a,b)=>b.date.localeCompare(a.date));
+  const sorted = data.map((d,i)=>[d,i]).sort((a,b)=>{
+    const c = b[0].date.localeCompare(a[0].date);
+    return c || b[1]-a[1];
+  }).map(([d])=>d);
   document.getElementById('tableCount').textContent = sorted.length;
   const badgeClass = m => {
     m = (m||'').toUpperCase();
