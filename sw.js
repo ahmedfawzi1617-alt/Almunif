@@ -1,4 +1,4 @@
-const CACHE = 'mmp-cache-v3';
+const CACHE = 'mmp-cache-v5';
 const CORE_URLS = [
   'OVERVIEW.html',
   'Production.html',
@@ -11,10 +11,10 @@ const CORE_URLS = [
 ];
 
 const CSV_URLS = [
-  { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRy9XHGoK6iYQSRku-7qWDSaUveGXT1ZjpjRa2Av0cBrsXeljctBGdF7AHOoKaSgoi7Nz2g6djTTZxC/pub?gid=390647355&single=true&output=csv', name: 'إنتاج', key: 'sw-prod' },
-  { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRy9XHGoK6iYQSRku-7qWDSaUveGXT1ZjpjRa2Av0cBrsXeljctBGdF7AHOoKaSgoi7Nz2g6djTTZxC/pub?gid=1615042796&single=true&output=csv', name: 'هالك', key: 'sw-scrap' },
-  { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQiYC7XUuYzsqOQkKtxFH667BvpK0sroldpVvGwJ-V4r0bfbA2-ar-ZlsBPyBLcMBDsi5EKFwWTmxC/pub?gid=1555908756&single=true&output=csv', name: 'معمل', key: 'sw-lab' },
-  { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQiYC7XUuYzsqOQkKtxFH667BvpK0sroldpVvGwJ-V4r0bfbA2-ar-ZlsBPyBLcMBDsi5EKFwWTmxC/pub?gid=845489182&single=true&output=csv', name: 'خام', key: 'sw-raw' }
+  { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRy9XHGoK6iYQSRku-7qWDSaUveGXT1ZjpjRa2Av0cBrsXeljctBGdF7AHOoKaSgoi7Nz2g6djTTZxC/pub?gid=390647355&single=true&output=csv', name: 'إنتاج', key: 'sw-prod', page: 'Production.html' },
+  { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRy9XHGoK6iYQSRku-7qWDSaUveGXT1ZjpjRa2Av0cBrsXeljctBGdF7AHOoKaSgoi7Nz2g6djTTZxC/pub?gid=1615042796&single=true&output=csv', name: 'هالك', key: 'sw-scrap', page: 'scrap_dashboard.html' },
+  { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQiYC7XUuYzsqOQkKtxFH667BvpK0sroldpVvGwJ-V4r0bfbA2-ar-ZlsBPyBLcMBDsi5EKFwWTmxC/pub?gid=1555908756&single=true&output=csv', name: 'معمل', key: 'sw-lab', page: 'LAB.html' },
+  { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQiYC7XUuYzsqOQkKtxFH667BvpK0sroldpVvGwJ-V4r0bfbA2-ar-ZlsBPyBLcMBDsi5EKFwWTmxC/pub?gid=845489182&single=true&output=csv', name: 'خام', key: 'sw-raw', page: 'RAW.html' }
 ];
 
 const VAPID_PUBLIC_KEY = 'BFe0Pj5XJd_J_XKStHr4QOBXHqDSqk01A8lGcQqMLBSYkH5sRc_c5r4P7phBO8rBDJFQLQ9FG8DJQqGU82BS0ik';
@@ -63,31 +63,59 @@ function scheduleBgCheck(){
 }
 
 async function checkAllChanges(){
-  await Promise.allSettled(CSV_URLS.map(entry => checkCsvChange(entry.url, entry.name, entry.key)));
+  await Promise.allSettled(CSV_URLS.map(entry => checkCsvChange(entry)));
 }
 
-async function checkCsvChange(url, name, key){
+function countRows(text){
+  const lines = text.split('\n').filter(l => l.trim());
+  return Math.max(0, lines.length - 1);
+}
+
+function extractLastRow(text){
+  const lines = text.split('\n').filter(l => l.trim());
+  if(lines.length < 2) return '';
+  const last = lines[lines.length - 1];
+  const cols = last.split(',');
+  return cols[0] + (cols[2] ? ' | ' + cols[2] : '');
+}
+
+async function checkCsvChange(entry){
   try{
     const ts = Date.now();
-    const sep = url.includes('?') ? '&' : '?';
-    const res = await fetch(url + sep + 'ts=' + ts, { cache: 'no-store' });
+    const sep = entry.url.includes('?') ? '&' : '?';
+    const res = await fetch(entry.url + sep + 'ts=' + ts, { cache: 'no-store' });
     if(!res.ok) return;
     const text = await res.text();
-    const fp = text.length + '|' + text.slice(0, 800);
+    const newRows = countRows(text);
+    const newLast = extractLastRow(text);
+    const fp = newRows + '|' + newLast + '|' + text.slice(0, 3000);
     const cache = await caches.open(CACHE);
-    const prevReq = new Request('fp-' + key);
+    const prevReq = new Request('fp-' + entry.key);
     const prevRes = await cache.match(prevReq);
     const prevFp = prevRes ? await prevRes.text() : null;
+
     if(prevFp && prevFp !== fp){
+      const prevRows = parseInt(prevFp.split('|')[0]) || 0;
+      const added = newRows - prevRows;
+      let detail = '📊 ' + entry.name;
+      if(added > 0){
+        detail += ': تمت إضافة ' + added + ' سجل';
+        if(newLast) detail += '\nآخر إدخال: ' + newLast;
+      } else if(added < 0){
+        detail += ': تم حذف ' + Math.abs(added) + ' سجل';
+      } else {
+        detail += ': تم تعديل البيانات';
+      }
       self.registration.showNotification('المنيف للأنابيب', {
-        body: '🔔 تحديث في بيانات ' + name,
+        body: detail,
         icon: 'icon-192.png',
-        tag: 'chg-' + key + '-' + ts,
+        tag: 'chg-' + entry.key + '-' + ts,
+        data: { url: entry.page, sheet: entry.name },
         requireInteraction: true,
         vibrate: [200, 100, 200],
         silent: false,
         actions: [
-          { action: 'open', title: 'فتح التطبيق' },
+          { action: 'open', title: 'فتح ' + entry.name },
           { action: 'close', title: 'تجاهل' }
         ]
       });
@@ -102,17 +130,20 @@ async function checkCsvChange(url, name, key){
 self.addEventListener('push', e => {
   let title = 'المنيف للأنابيب';
   let body = 'تحديث في البيانات';
+  let targetUrl = 'OVERVIEW.html';
   try{
     if(e.data){
       const d = e.data.json();
       if(d.title) title = d.title;
       if(d.body) body = d.body;
+      if(d.url) targetUrl = d.url;
     }
   }catch(_){}
   self.registration.showNotification(title, {
     body,
     icon: 'icon-192.png',
     tag: 'push-' + Date.now(),
+    data: { url: targetUrl },
     requireInteraction: true,
     vibrate: [200, 100, 200],
     silent: false,
@@ -192,10 +223,18 @@ self.addEventListener('fetch', e => {
 self.addEventListener('notificationclick', e => {
   if(e.action === 'close'){ e.notification.close(); return; }
   e.notification.close();
+  const targetUrl = (e.notification.data && e.notification.data.url) || 'OVERVIEW.html';
+  const sheetName = (e.notification.data && e.notification.data.sheet) || '';
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cls => {
-      if(cls.length > 0){ cls[0].focus(); return; }
-      clients.openWindow('OVERVIEW.html');
+      for(const c of cls){
+        if(c.url && c.url.includes(targetUrl)){
+          c.focus();
+          if(sheetName) c.postMessage({ type: 'focus-sheet', sheet: sheetName });
+          return;
+        }
+      }
+      clients.openWindow(targetUrl);
     })
   );
 });

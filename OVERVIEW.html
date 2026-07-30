@@ -492,7 +492,7 @@ async function loadOverview(){
 
   document.getElementById('statusText').textContent = 'آخر تحديث: ' + new Date().toLocaleTimeString('ar-EG');
   document.getElementById('setupBanner').style.display = (prodRows && scrapRows && labRows && rawRows) ? 'none' : 'flex';
-  checkChanges('overview', prodRows, 'إنتاج جديد');
+  checkChanges('overview', prodRows, 'إنتاج جديد', 'icon-192.png', 'OVERVIEW.html');
 }
 
 loadOverview();
