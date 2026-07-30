@@ -68,10 +68,11 @@ function requestNotifPermissionClick(){
 function checkChanges(key, data, title, icon, pageUrl){
   if(!data || !data.length) return;
 
-  /* بصمة كل order_no مخزنة */
-  const oldOrderSet = localStorage.getItem(key + '_orders');
-  const currOrders = data.map(r => r.order_no || '');
-  localStorage.setItem(key + '_orders', JSON.stringify(currOrders));
+  /* بصمة معرفات الصفوف (order_no أو defect+product+weight) */
+  const idKey = key + '_ids';
+  const oldIdSet = localStorage.getItem(idKey);
+  const currIds = data.map(r => r.order_no || (r.defect_ar||'') + '|' + (r.product||'') + '|' + (r.weight||''));
+  localStorage.setItem(idKey, JSON.stringify(currIds));
 
   /* بصمة البيانات الكاملة */
   const prev = localStorage.getItem(key);
@@ -82,13 +83,13 @@ function checkChanges(key, data, title, icon, pageUrl){
   if(prev === null) return;
   if(prev === curr) return;
 
-  /* استخراج الـ order_no الجديدة */
-  let newOrders = [];
-  if(oldOrderSet){
+  /* استخراج المعرفات الجديدة */
+  let newIds = [];
+  if(oldIdSet){
     try{
-      const oldOrders = JSON.parse(oldOrderSet);
-      const oldSet = new Set(oldOrders);
-      newOrders = currOrders.filter(o => o && !oldSet.has(o));
+      const oldIds = JSON.parse(oldIdSet);
+      const oldSet = new Set(oldIds);
+      newIds = currIds.filter(o => o && !oldSet.has(o));
     }catch(_){}
   }
 
@@ -107,11 +108,23 @@ function checkChanges(key, data, title, icon, pageUrl){
     detail = 'تم حذف ' + Math.abs(diff) + ' سجل';
   }
 
+  let lastRowStr = '';
+  if(lastRow){
+    const parts = [];
+    if(lastRow.date) parts.push(lastRow.date);
+    if(lastRow.product) parts.push(lastRow.product);
+    if(lastRow.order_no) parts.push(lastRow.order_no);
+    if(lastRow.defect_ar) parts.push(lastRow.defect_ar);
+    if(lastRow.machine) parts.push(lastRow.machine);
+    if(lastRow.weight) parts.push(lastRow.weight);
+    lastRowStr = parts.slice(0,4).join(' | ');
+  }
+
   const chgData = {
     sheet: title || '', key: key, page: pageUrl || '',
     added: diff,
-    lastRow: lastRow ? ((lastRow.date||'') + ' | ' + (lastRow.product||'') + ' | ' + (lastRow.order_no||'')) : '',
-    newOrders: newOrders.slice(-5),
+    lastRow: lastRowStr,
+    newIds: newIds.slice(-5),
     time: Date.now()
   };
   _lastChg = chgData;
@@ -138,42 +151,51 @@ function highlightRows(chgData){
   document.querySelectorAll('.highlight-new').forEach(el => el.classList.remove('highlight-new'));
   if(window._hlRetry){ clearTimeout(window._hlRetry); window._hlRetry = null; }
 
-  const doHL = () => {
-    const table = document.querySelector('table');
-    if(!table){
-      window._hlRetry = setTimeout(doHL, 800);
-      return;
-    }
-    const tbody = table.querySelector('tbody') || table;
-    const rows = [...tbody.querySelectorAll('tr')].filter(r => !r.querySelector('th'));
+    const doHL = () => {
+      /* اختر الجدول المناسب: dailyScrapTableBody → defectTableBody → أول جدول */
+      let table = document.getElementById('dailyScrapTableBody');
+      if(!table || !table.closest('table')) table = document.querySelector('table:not(.info-header-table):not(.summary-table)');
+      if(!table) table = document.querySelector('table');
+      if(!table){
+        window._hlRetry = setTimeout(doHL, 800);
+        return;
+      }
+      table = table.closest ? (table.closest('table') || table) : table;
+      const tbody = table.querySelector('tbody') || table;
+      const rows = [...tbody.querySelectorAll('tr')].filter(r => !r.querySelector('th'));
     if(!rows.length){ showNotifBanner('📊 تم التحديث', 'info'); return; }
 
     let highlighted = 0;
 
-    /* 1. دور على order_no متطابقة في الخلايا */
-    const orders = (chgData.newOrders || []).filter(Boolean);
-    for(const ord of orders){
-      const o = ord.trim();
-      for(const row of rows){
-        const cells = row.querySelectorAll('td, th');
-        for(const cell of cells){
-          const txt = (cell.textContent || '').trim();
-          if(txt === o || txt.includes(o) || o.includes(txt)){
-            row.classList.add('highlight-new');
-            highlighted++;
-            break;
+    /* 1. دور على المعرفات الجديدة (order_no أو defect+product+weight) */
+    const ids = (chgData.newIds || chgData.newOrders || []).filter(Boolean);
+    for(const id of ids){
+      const parts = id.split('|').map(s => s.trim()).filter(Boolean);
+      for(const p of parts){
+        if(p.length < 2) continue;
+        for(const row of rows){
+          const cells = row.querySelectorAll('td');
+          for(const cell of cells){
+            const txt = (cell.textContent || '').trim();
+            if(txt === p || txt.includes(p) || p.includes(txt)){
+              row.classList.add('highlight-new');
+              highlighted++;
+              break;
+            }
           }
+          if(highlighted) break;
         }
         if(highlighted) break;
       }
+      if(highlighted) break;
     }
 
-    /* 2. لو ما لقاش، دور على آخر صفوف في RAW */
+    /* 2. لو ما لقاش، دور على lastRow */
     if(!highlighted && chgData.lastRow){
       const parts = chgData.lastRow.split('|').map(s => s.trim()).filter(s => s.length > 3);
       for(const p of parts){
         for(const row of rows){
-          const cells = row.querySelectorAll('td, th');
+          const cells = row.querySelectorAll('td');
           for(const cell of cells){
             if((cell.textContent || '').includes(p)){
               row.classList.add('highlight-new');
@@ -187,7 +209,7 @@ function highlightRows(chgData){
       }
     }
 
-    /* 3. لو لسه ما لقاش، ظلل أول صفوف (الأحدث) */
+    /* 3. ظلل أول صفوف (الأحدث) */
     if(!highlighted){
       const n = Math.max(1, chgData.added > 0 ? chgData.added : 3);
       for(let i = 0; i < Math.min(n, rows.length); i++){
@@ -197,7 +219,7 @@ function highlightRows(chgData){
     }
 
     table.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if(highlighted) showNotifBanner('🚨 تم إظهار ' + highlighted + ' سجل', 'info');
+    if(highlighted) showNotifBanner('🚨 تم إظهار ' + highlighted + ' صف', 'info');
   };
 
   doHL();
