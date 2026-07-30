@@ -1,7 +1,7 @@
 {
   "name": "المنيف للأنابيب — لوحة الإنتاج والهالك",
   "short_name": "المنيف MMP",
-  "description": "لوحة الإنتاج والهالك واختبارات الإنتاج النهائي واختبارات المواد الخام — مصنع المنيف للأنابيب",
+  "description": "لوحة الإنتاج والهالك واختبارات المنتج النهائي واختبارات المواد الخام — مصنع المنيف للأنابيب",
   "start_url": "OVERVIEW.html",
   "scope": ".",
   "display": "standalone",
@@ -20,5 +20,5 @@
   "prefer_related_applications": false,
   "related_applications": [],
   "permissions": ["notifications", "background-sync", "periodic-background-sync"],
-  "description": "لوحة الإنتاج والهالك واختبارات الإنتاج النهائي واختبارات المواد الخام — مصنع المنيف للأنابيب"
+  "description": "لوحة الإنتاج والهالك واختبارات المنتج النهائي واختبارات المواد الخام — مصنع المنيف للأنابيب"
 }

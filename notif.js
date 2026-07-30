@@ -219,14 +219,15 @@ function resetApp(){
 (function injectCSS(){
   const style = document.createElement('style');
   style.textContent = `
-    @keyframes highlightPulse {
-      0% { background: rgba(45,212,191,0.5) !important; box-shadow: inset 0 0 0 3px #2dd4bf, 0 0 20px rgba(45,212,191,0.3) !important; }
-      25% { background: rgba(45,212,191,0.25) !important; box-shadow: inset 0 0 0 2px rgba(45,212,191,0.8) !important; }
-      50% { background: rgba(45,212,191,0.12) !important; }
-      100% { background: transparent !important; box-shadow: none !important; }
+    @keyframes alarmBlink {
+      0%, 100% { background: rgba(242,103,139,0.5) !important; box-shadow: 0 0 25px rgba(242,103,139,0.6), inset 0 0 0 2px #f2678b !important; }
+      12% { background: rgba(242,167,59,0.5) !important; box-shadow: 0 0 25px rgba(242,167,59,0.6), inset 0 0 0 2px #f2a93b !important; }
+      25% { background: rgba(45,212,191,0.5) !important; box-shadow: 0 0 25px rgba(45,212,191,0.6), inset 0 0 0 2px #2dd4bf !important; }
+      37% { background: rgba(155,140,242,0.5) !important; box-shadow: 0 0 25px rgba(155,140,242,0.6), inset 0 0 0 2px #9b8cf2 !important; }
+      50% { background: rgba(242,103,139,0.5) !important; box-shadow: 0 0 25px rgba(242,103,139,0.6), inset 0 0 0 2px #f2678b !important; }
     }
     .highlight-new {
-      animation: highlightPulse 3s ease-out forwards !important;
+      animation: alarmBlink 1.2s ease-in-out 3 !important;
       border-radius: 4px;
     }
     #mmpNotifBtnInner:hover { transform:scale(1.1); }

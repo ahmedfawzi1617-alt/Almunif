@@ -100,23 +100,15 @@ async function checkCsvChange(entry){
       else if(added < 0) detail += ': تم حذف ' + Math.abs(added) + ' سجل';
       else detail += ': تم تعديل البيانات';
 
-      /* تخزين تفاصيل التغيير لإرسالها للصفحة عند الضغط */
-      const changeKey = 'chg-' + entry.key + '-' + ts;
-      const changeData = {
-        sheet: entry.name,
-        key: entry.key,
-        page: entry.page,
-        added: added,
-        lastRow: newLast,
-        time: ts
-      };
-      cache.put(new Request('chg-' + entry.key), new Response(JSON.stringify(changeData)));
-
       self.registration.showNotification('المنيف للأنابيب', {
         body: detail,
         icon: 'icon-192.png',
-        tag: changeKey,
-        data: { url: entry.page, sheet: entry.name, chgKey: entry.key },
+        tag: 'chg-' + entry.key + '-' + ts,
+        data: {
+          url: entry.page,
+          sheet: entry.name,
+          chgData: { sheet: entry.name, key: entry.key, page: entry.page, added: added, lastRow: newLast, time: ts }
+        },
         requireInteraction: true,
         vibrate: [200, 100, 200],
         silent: false,
@@ -219,19 +211,10 @@ self.addEventListener('notificationclick', e => {
   if(e.action === 'close'){ e.notification.close(); return; }
   e.notification.close();
   const targetUrl = (e.notification.data && e.notification.data.url) || 'OVERVIEW.html';
-  const chgKey = (e.notification.data && e.notification.data.chgKey) || '';
 
   e.waitUntil(
     (async () => {
-      /* استرداد تفاصيل التغيير من الكاش */
-      let chgData = null;
-      if(chgKey){
-        try{
-          const cache = await caches.open(CACHE);
-          const chgRes = await cache.match(new Request('chg-' + chgKey));
-          if(chgRes) chgData = await chgRes.json();
-        }catch(_){}
-      }
+      const chgData = (e.notification.data && e.notification.data.chgData) || null;
       /* فتح أو التركيز على الصفحة */
       const cls = await clients.matchAll({ type: 'window', includeUncontrolled: true });
       for(const c of cls){
