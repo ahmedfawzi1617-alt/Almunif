@@ -1,6 +1,6 @@
 {
-  "name": "MMP Egypt — تحليل الإنتاج",
-  "short_name": "MMP Egypt",
+  "name": "المنيف للأنابيب — لوحة التحليل والإنتاج",
+  "short_name": "المنيف MMP",
   "description": "لوحة تحليل الإنتاج والهالك والاختبارات المعملية — مصنع المنيف للأنابيب",
   "start_url": "OVERVIEW.html",
   "scope": ".",
@@ -10,8 +10,10 @@
   "theme_color": "#0a1628",
   "dir": "rtl",
   "lang": "ar",
+  "categories": ["business", "productivity", "manufacturing"],
+  "display_override": ["window-controls-overlay", "standalone"],
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
