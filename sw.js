@@ -237,14 +237,13 @@ self.addEventListener('notificationclick', e => {
       for(const c of cls){
         if(c.url && c.url.includes(targetUrl)){
           c.focus();
-          if(chgData) c.postMessage({ type: 'highlight-changes', chgData });
+          if(chgData) setTimeout(() => c.postMessage({ type: 'highlight-changes', chgData }), 300);
           return;
         }
       }
       const newClient = await clients.openWindow(targetUrl);
       if(newClient && chgData){
-        /* انتظر تحميل الصفحة ثم أرسل التغييرات */
-        newClient.postMessage({ type: 'highlight-changes', chgData });
+        setTimeout(() => newClient.postMessage({ type: 'highlight-changes', chgData }), 1500);
       }
     })()
   );

@@ -123,47 +123,63 @@ function checkChanges(key, data, title, icon, pageUrl){
 /* ========== إظهار الصفوف الجديدة ========== */
 function highlightRows(chgData){
   if(!chgData) return;
-  const table = document.querySelector('table');
-  if(!table){ showNotifBanner('📊 تم التحديث — روح إلى التقرير', 'info'); return; }
-  const tbody = table.querySelector('tbody') || table;
-  const rows = tbody.querySelectorAll('tr');
-  if(!rows.length) return;
 
-  /* إزالة التظليل القديم */
-  document.querySelectorAll('.highlight-new').forEach(el => {
-    el.classList.remove('highlight-new');
-  });
+  /* شيل التظليل القديم */
+  document.querySelectorAll('.highlight-new').forEach(el => el.classList.remove('highlight-new'));
 
-  let highlightCount = 0;
-  const last = chgData.lastRow || '';
-  const searchStr = last.replace(/\s*\|\s*/g, ' ').trim();
-
-  if(searchStr){
-    for(let i = rows.length - 1; i >= 0; i--){
-      const text = rows[i].textContent || '';
-      if(text.includes(searchStr)){
-        rows[i].classList.add('highlight-new');
-        highlightCount++;
-        if(highlightCount >= (chgData.added > 0 ? chgData.added : 3)) break;
+  /* انتظر شوية لو الصفحة لسه بتتحمل */
+  const doHighlight = () => {
+    const table = document.querySelector('table');
+    if(!table){
+      /* لو مش فيه جدول (مثل OVERVIEW)، جرب تاني بعد ثانية */
+      if(!window._hlRetry){
+        window._hlRetry = setTimeout(doHighlight, 1000);
+        return;
       }
+      window._hlRetry = null;
+      showNotifBanner('📊 تم التحديث', 'info');
+      return;
     }
-  }
+    window._hlRetry = null;
 
-  /* لو ما لقتش مطابقة، ظلل آخر X صفوف */
-  if(!highlightCount && chgData.added > 0){
-    const start = Math.max(0, rows.length - chgData.added);
+    const tbody = table.querySelector('tbody') || table;
+    const rows = tbody.querySelectorAll('tr');
+    if(!rows.length) return;
+
+    const numToHighlight = Math.min(chgData.added > 0 ? chgData.added : 3, rows.length);
+    const start = rows.length - numToHighlight;
+
+    /* ظلل آخر N صفوف (اللي اتضافت) */
     for(let i = start; i < rows.length; i++){
       rows[i].classList.add('highlight-new');
-      highlightCount++;
     }
-  }
 
-  /* لفّ للجدول */
-  table.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    /* حاول كمان تطابق النص في الخلايا */
+    if(chgData.lastRow){
+      const parts = chgData.lastRow.split('|').map(s => s.trim()).filter(Boolean);
+      for(const p of parts){
+        if(p.length < 3) continue;
+        let found = 0;
+        for(let i = start; i < rows.length; i++){
+          const cells = rows[i].querySelectorAll('td, th');
+          for(const cell of cells){
+            if((cell.textContent || '').trim().includes(p)){
+              rows[i].classList.add('highlight-new');
+              found++;
+              break;
+            }
+          }
+          if(found >= numToHighlight) break;
+        }
+      }
+    }
 
-  if(highlightCount > 0){
-    showNotifBanner('✨ تم إظهار ' + highlightCount + ' سجل جديد', 'info');
-  }
+    /* لف للجدول */
+    table.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    showNotifBanner('✨ تم إظهار ' + numToHighlight + ' سجل جديد', 'info');
+  };
+
+  doHighlight();
 }
 
 /* ========== البنر ========== */
@@ -204,12 +220,14 @@ function resetApp(){
   const style = document.createElement('style');
   style.textContent = `
     @keyframes highlightPulse {
-      0% { background: rgba(45,212,191,0.3); box-shadow: inset 0 0 0 2px rgba(45,212,191,0.6); }
-      50% { background: rgba(45,212,191,0.15); }
-      100% { background: transparent; box-shadow: none; }
+      0% { background: rgba(45,212,191,0.5) !important; box-shadow: inset 0 0 0 3px #2dd4bf, 0 0 20px rgba(45,212,191,0.3) !important; }
+      25% { background: rgba(45,212,191,0.25) !important; box-shadow: inset 0 0 0 2px rgba(45,212,191,0.8) !important; }
+      50% { background: rgba(45,212,191,0.12) !important; }
+      100% { background: transparent !important; box-shadow: none !important; }
     }
     .highlight-new {
-      animation: highlightPulse 3s ease-out forwards;
+      animation: highlightPulse 3s ease-out forwards !important;
+      border-radius: 4px;
     }
     #mmpNotifBtnInner:hover { transform:scale(1.1); }
     #mmpNotifBtnInner:active { transform:scale(0.95); }
