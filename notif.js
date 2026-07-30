@@ -4,21 +4,21 @@ function requestNotifPermission(){
   }
 }
 
+function getDataFingerprint(data){
+  if(!data || !data.length) return '';
+  return data.length + '|' + data.map(r => r.date + (r.order_no||'') + (r.product||'') + (r.qty_kg||0)).join(',');
+}
+
 function checkChanges(key, data, title, icon){
   if(!data || !data.length) return;
-  const prev = JSON.parse(localStorage.getItem(key) || '{}');
-  const snapshot = data.slice(-5).map(r => r.date + '|' + (r.order_no||'') + '|' + (r.product||'') + '|' + (r.customer||''));
-  const curr = { count: data.length, snapshot };
-  localStorage.setItem(key, JSON.stringify(curr));
-  if(!prev.count) return;
-  if(prev.count === curr.count){
-    const same = prev.snapshot && prev.snapshot.length === curr.snapshot.length && prev.snapshot.every((v,i) => v === curr.snapshot[i]);
-    if(same) return;
-  }
-  const added = curr.count - prev.count;
-  const msg = added > 0 ? `تمت إضافة ${added} سجل جديد` : `تحديث في البيانات`;
+  const prev = localStorage.getItem(key);
+  const curr = getDataFingerprint(data);
+  localStorage.setItem(key, curr);
+  if(prev === null) return;
+  if(prev === curr) return;
+  const msg = 'تم تعديل البيانات';
   if('Notification' in window && Notification.permission === 'granted'){
-    try{ new Notification(title || 'MMP Egypt', { body: msg, icon: icon || 'icon-192.png' }); }catch(e){}
+    try{ new Notification(title || 'MMP Egypt', { body: msg, icon: icon || 'icon-192.png', tag: key }); }catch(e){}
   }
   showNotifBanner(msg, 'info');
 }
