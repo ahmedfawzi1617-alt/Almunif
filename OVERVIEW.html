@@ -288,19 +288,19 @@
 
     <a href="LAB.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-      تحليل الاختبارات المعملية
+      اختبارات الإنتاج النهائي
     </a>
     <a href="scrap_dashboard.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-4.3 4.3-2.5-2.5L7 14.7"/></svg>
-      تحليل الهالك
+      الهالك
     </a>
     <a href="RAW.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6l-5.5 9.5A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.5L14 9V3"/></svg>
-      تحليل المواد الخام
+      اختبارات المواد الخام
     </a>
     <a href="Production.html">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="7" width="15" height="13" rx="2"/><path d="M16 11l5-3v10l-5-3"/></svg>
-      تحليل الإنتاج
+      الإنتاج
     </a>
   </nav>
 
@@ -333,7 +333,7 @@
 
     <a href="Production.html" class="overview-card">
       <div class="oc-icon oc-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="7" width="15" height="13" rx="2"/><path d="M16 11l5-3v10l-5-3"/></svg></div>
-      <h3>تحليل الإنتاج</h3>
+      <h3>الإنتاج</h3>
       <div class="oc-stat"><span class="oc-num" id="ovProdTotal">—</span><span class="oc-lbl">كجم إجمالي الإنتاج</span></div>
       <div class="oc-stat"><span class="oc-num" id="ovProdOverWt" style="font-size:15px;">—</span><span class="oc-lbl">Over Weight</span></div>
       <div class="oc-go">افتح اللوحة ←</div>
@@ -341,7 +341,7 @@
 
     <a href="scrap_dashboard.html" class="overview-card">
       <div class="oc-icon oc-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-4.3 4.3-2.5-2.5L7 14.7"/></svg></div>
-      <h3>تحليل الهالك</h3>
+      <h3>الهالك</h3>
       <div class="oc-stat"><span class="oc-num" id="ovScrapTotal">—</span><span class="oc-lbl">كجم إجمالي الهالك</span></div>
       <div class="oc-stat"><span class="oc-num" id="ovScrapPct" style="font-size:20px;">—</span><span class="oc-lbl">نسبة الهالك</span></div>
       <div class="oc-go">افتح اللوحة ←</div>
@@ -349,7 +349,7 @@
 
     <a href="LAB.html" class="overview-card">
       <div class="oc-icon oc-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6l-5.5 9.5A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.5L14 9V3"/></svg></div>
-      <h3>تحليل الاختبارات المعملية</h3>
+      <h3>اختبارات الإنتاج النهائي</h3>
       <div class="oc-stat"><span class="oc-num" id="ovLabPass">—</span><span class="oc-lbl">نسبة النجاح</span></div>
       <div class="oc-stat"><span class="oc-num" id="ovLabCount">—</span><span class="oc-lbl">عدد الاختبارات</span></div>
       <div class="oc-go">افتح اللوحة ←</div>
@@ -357,7 +357,7 @@
 
     <a href="RAW.html" class="overview-card">
       <div class="oc-icon oc-violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></div>
-      <h3>تحليل المواد الخام</h3>
+      <h3>اختبارات المواد الخام</h3>
       <div class="oc-stat"><span class="oc-num" id="ovRawCount">—</span><span class="oc-lbl">عدد العينات</span></div>
       <div class="oc-stat"><span class="oc-num" id="ovRawGrade" style="font-size:15px;">—</span><span class="oc-lbl">أكتر صنف</span></div>
       <div class="oc-go">افتح اللوحة ←</div>
@@ -463,7 +463,7 @@ async function loadOverview(){
     document.getElementById('ovScrapPct').textContent = pct.toFixed(2)+'%';
   }
 
-  // ===== الاختبارات المعملية =====
+  // ===== اختبارات الإنتاج النهائي =====
   if(labRows){
     const results = labRows.map(r=>{
       const v = String(pick(r,'Overall\nResult','Overall Result')).trim().toLowerCase();
@@ -477,7 +477,7 @@ async function loadOverview(){
     document.getElementById('ovLabCount').textContent = results.length;
   }
 
-  // ===== المواد الخام =====
+  // ===== اختبارات المواد الخام =====
   if(rawRows){
     const validRows = rawRows.filter(r=>pick(r,'Date'));
     document.getElementById('ovRawCount').textContent = validRows.length;
