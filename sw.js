@@ -171,6 +171,22 @@ self.addEventListener('message', e => {
     checkAllChanges();
     return;
   }
+  if(data.type === 'show-notif' && data.title && data.body){
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: data.icon || 'icon-192.png',
+      tag: data.tag || 'msg-' + Date.now(),
+      data: { url: data.url || '' },
+      requireInteraction: true,
+      vibrate: [200, 100, 200],
+      silent: false,
+      actions: [
+        { action: 'open', title: 'فتح' },
+        { action: 'close', title: 'تجاهل' }
+      ]
+    });
+    return;
+  }
 });
 
 /* ---------- Sync / Periodic Sync ---------- */

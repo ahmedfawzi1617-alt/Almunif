@@ -11,34 +11,56 @@ if('serviceWorker' in navigator){
   });
 }
 
-/* ---------- طلب الإذن ---------- */
+/* ========== الإذن ========== */
 function requestNotifPermission(){
-  if('Notification' in window && Notification.permission === 'default'){
-    Notification.requestPermission();
+  const n = ('Notification' in window);
+  if(!n) return;
+  if(Notification.permission === 'granted') return;
+  if(Notification.permission === 'denied'){
+    console.warn('⚠️ الإشعارات مرفوضة. اذهب إلى إعدادات الموقع وافتح الإذن.');
+    showNotifBanner('⚠️ الإشعارات مرفوضة — اذهب إلى إعدادات الموقع واسمح بها', 'warn');
+    return;
   }
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.ready.then(reg => {
-      if('periodicSync' in reg){
-        try{ reg.periodicSync.register('check-changes', { minInterval: 120000 }); }catch(_){}
-      }
-    });
-  }
-  startSWKeepAlive();
+  /* default — اطلب الإذن الآن */
+  Notification.requestPermission().then(p => {
+    if(p === 'granted'){
+      showNotifBanner('✅ تم قبول الإشعارات', 'info');
+    } else {
+      showNotifBanner('⚠️ تم رفض الإشعارات — لو عايز تغير رأيك، اذهب إلى إعدادات الموقع', 'warn');
+    }
+  }).catch(() => {});
 }
 
-/* ---------- بصمة البيانات ---------- */
+/* زر طلب الإذن (للاستخدام مع onclick) */
+function requestNotifPermissionClick(){
+  if(!('Notification' in window)) return;
+  Notification.requestPermission().then(p => {
+    if(p === 'granted'){
+      showNotifBanner('✅ تم تفعيل الإشعارات', 'info');
+    }
+  }).catch(() => {});
+}
+
+/* ========== البصمة ========== */
 function getDataFingerprint(data){
   if(!data || !data.length) return '';
-  return data.length + '|' + data.map(r => (r.date||'') + '|' + (r.order_no||'') + '|' + (r.product||'')).join(',');
+  const rows = data.map(r => [
+    r.date || '',
+    r.order_no || '',
+    r.product || '',
+    r.qty_kg || 0,
+    r.customer || ''
+  ].join('||')).join('\x01');
+  return data.length + '|' + rows;
 }
 
-/* ---------- فحص التغيير ---------- */
+/* ========== الفحص ========== */
 function checkChanges(key, data, title, icon, pageUrl){
   if(!data || !data.length) return;
   const prev = localStorage.getItem(key);
   const curr = getDataFingerprint(data);
   localStorage.setItem(key, curr);
-  sendToSW('store-fp', { key: 'fp-' + key, fp: curr });
+  sendToSW('store-fp', { key: 'sw-' + key, fp: curr });
 
   if(prev === null) return;
   if(prev === curr) return;
@@ -59,21 +81,18 @@ function checkChanges(key, data, title, icon, pageUrl){
     detail = 'تم حذف ' + Math.abs(diff) + ' سجل';
   }
 
-  const msg = title || 'المنيف للأنابيب';
-  if('Notification' in window && Notification.permission === 'granted'){
-    try{
-      new Notification(msg, {
-        body: detail,
-        icon: icon || 'icon-192.png',
-        tag: key + '-' + Date.now(),
-        data: { url: pageUrl || '' }
-      });
-    }catch(e){}
-  }
+  /* إرسال الإشعار عن طريق Service Worker (يدعم الخلفية والموبايل) */
+  sendToSW('show-notif', {
+    title: title || 'المنيف للأنابيب',
+    body: detail,
+    icon: icon || 'icon-192.png',
+    tag: 'page-' + key + '-' + Date.now(),
+    url: pageUrl || ''
+  });
   showNotifBanner('🔔 ' + detail, 'info');
 }
 
-/* ---------- البنر ---------- */
+/* ========== البنر ========== */
 function showNotifBanner(msg, type){
   const el = document.getElementById('notifBanner');
   if(!el) return;
@@ -84,11 +103,13 @@ function showNotifBanner(msg, type){
   el._hide = setTimeout(() => { el.style.display = 'none'; }, 6000);
 }
 
-/* ---------- التواصل مع Service Worker ---------- */
+/* ========== التواصل مع Service Worker ========== */
 function sendToSW(type, payload){
   if(!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.ready.then(reg => {
-    reg.active && reg.active.postMessage({ type: type, ...payload });
+    if(reg.active){
+      reg.active.postMessage({ type: type, ...payload });
+    }
   }).catch(() => {});
 }
 
@@ -99,9 +120,9 @@ function startSWKeepAlive(){
   }, 45000);
 }
 
-/* ---------- إعادة تعيين كامل ---------- */
+/* ========== إعادة تعيين كامل ========== */
 function resetApp(){
-  const keys = Object.keys(localStorage).filter(k => k.startsWith('fp-') || k === 'mmp_fp');
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('fp-') || k === 'mmp_fp' || k.startsWith('prod') || k.startsWith('scrap') || k.startsWith('lab') || k.startsWith('raw') || k.startsWith('overview'));
   keys.forEach(k => localStorage.removeItem(k));
   if('caches' in window){
     caches.keys().then(names => Promise.all(names.map(n => caches.delete(n)))).catch(() => {});
