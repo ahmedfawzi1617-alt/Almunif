@@ -1005,6 +1005,12 @@ document.addEventListener('keypress', e=>{
   }
 });
 </script>
-<script>if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}</script>
+<script>if('serviceWorker'in navigator){navigator.serviceWorker.register('sw.js').then(reg => {
+  navigator.serviceWorker.addEventListener('message', e => {
+    if(e.data && e.data.type === 'push-sub'){
+      localStorage.setItem('mmp_push_sub', JSON.stringify(e.data.sub));
+    }
+  });
+}).catch(()=>{});}</script>
 </body>
 </html>
