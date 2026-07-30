@@ -1,7 +1,7 @@
 var _swKeepAlive = null;
 var _lastChg = null;
 
-/* ========== فلوتنج بزر الإشعارات (فوق اليسار) ========== */
+/* ========== فلوتنج بزر الإشعارات ========== */
 (function injectNotifBtn(){
   const div = document.createElement('div');
   div.id = 'mmpNotifBtn';
@@ -26,9 +26,6 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message', e => {
     const d = e.data;
     if(!d) return;
-    if(d.type === 'focus-sheet' && d.sheet){
-      showNotifBanner('📊 فتح بيانات ' + d.sheet, 'info');
-    }
     if(d.type === 'highlight-changes' && d.chgData){
       _lastChg = d.chgData;
       highlightRows(d.chgData);
@@ -67,16 +64,16 @@ function requestNotifPermissionClick(){
   }).catch(() => {});
 }
 
-/* ========== بصمة البيانات ========== */
-function getDataFingerprint(data){
-  if(!data || !data.length) return '';
-  const rows = data.map(r => [r.date||'', r.order_no||'', r.product||'', r.qty_kg||0, r.customer||''].join('||')).join('\x01');
-  return data.length + '|' + rows;
-}
-
-/* ========== فحص التغيير ========== */
+/* ========== فحص التغيير بالـ order_no ========== */
 function checkChanges(key, data, title, icon, pageUrl){
   if(!data || !data.length) return;
+
+  /* بصمة كل order_no مخزنة */
+  const oldOrderSet = localStorage.getItem(key + '_orders');
+  const currOrders = data.map(r => r.order_no || '');
+  localStorage.setItem(key + '_orders', JSON.stringify(currOrders));
+
+  /* بصمة البيانات الكاملة */
   const prev = localStorage.getItem(key);
   const curr = getDataFingerprint(data);
   localStorage.setItem(key, curr);
@@ -85,9 +82,18 @@ function checkChanges(key, data, title, icon, pageUrl){
   if(prev === null) return;
   if(prev === curr) return;
 
-  const prevCount = parseInt(prev.split('|')[0]) || 0;
-  const currCount = parseInt(curr.split('|')[0]) || 0;
-  const diff = currCount - prevCount;
+  /* استخراج الـ order_no الجديدة */
+  let newOrders = [];
+  if(oldOrderSet){
+    try{
+      const oldOrders = JSON.parse(oldOrderSet);
+      const oldSet = new Set(oldOrders);
+      newOrders = currOrders.filter(o => o && !oldSet.has(o));
+    }catch(_){}
+  }
+
+  /* بيانات التغيير */
+  const diff = data.length - parseInt(prev.split('|')[0]) || 0;
   const lastRow = data[data.length - 1];
   let detail = 'تم تعديل البيانات';
   if(diff > 0){
@@ -101,15 +107,15 @@ function checkChanges(key, data, title, icon, pageUrl){
     detail = 'تم حذف ' + Math.abs(diff) + ' سجل';
   }
 
-  /* إظهار الصفوف الجديدة في الصفحة الحالية */
   const chgData = {
-    sheet: title || '',
-    key: key, page: pageUrl || '',
-    added: diff, lastRow: lastRow ? ((lastRow.date||'') + ' | ' + (lastRow.product||'') + ' | ' + (lastRow.order_no||'')) : '',
+    sheet: title || '', key: key, page: pageUrl || '',
+    added: diff,
+    lastRow: lastRow ? ((lastRow.date||'') + ' | ' + (lastRow.product||'') + ' | ' + (lastRow.order_no||'')) : '',
+    newOrders: newOrders.slice(-5),
     time: Date.now()
   };
   _lastChg = chgData;
-  setTimeout(() => highlightRows(chgData), 500);
+  setTimeout(() => highlightRows(chgData), 800);
 
   sendToSW('show-notif', {
     title: title || 'المنيف للأنابيب',
@@ -120,66 +126,79 @@ function checkChanges(key, data, title, icon, pageUrl){
   showNotifBanner('🔔 ' + detail, 'info');
 }
 
-/* ========== إظهار الصفوف الجديدة ========== */
+/* ========== بصمة البيانات ========== */
+function getDataFingerprint(data){
+  if(!data || !data.length) return '';
+  const rows = data.map(r => [r.date||'', r.order_no||'', r.product||'', r.qty_kg||0, r.customer||''].join('||')).join('\x01');
+  return data.length + '|' + rows;
+}
+
+/* ========== إظهار الصفوف الجديدة (تظليل إنذار) ========== */
 function highlightRows(chgData){
   if(!chgData) return;
-
-  /* شيل التظليل القديم */
   document.querySelectorAll('.highlight-new').forEach(el => el.classList.remove('highlight-new'));
+  if(window._hlRetry){ clearTimeout(window._hlRetry); window._hlRetry = null; }
 
-  /* انتظر شوية لو الصفحة لسه بتتحمل */
-  const doHighlight = () => {
+  const doHL = () => {
     const table = document.querySelector('table');
     if(!table){
-      /* لو مش فيه جدول (مثل OVERVIEW)، جرب تاني بعد ثانية */
-      if(!window._hlRetry){
-        window._hlRetry = setTimeout(doHighlight, 1000);
-        return;
-      }
-      window._hlRetry = null;
-      showNotifBanner('📊 تم التحديث', 'info');
+      window._hlRetry = setTimeout(doHL, 800);
       return;
     }
-    window._hlRetry = null;
-
     const tbody = table.querySelector('tbody') || table;
-    const rows = tbody.querySelectorAll('tr');
-    if(!rows.length) return;
+    const rows = [...tbody.querySelectorAll('tr')];
+    if(!rows.length){ showNotifBanner('📊 تم التحديث', 'info'); return; }
 
-    const numToHighlight = Math.min(chgData.added > 0 ? chgData.added : 3, rows.length);
-    const start = rows.length - numToHighlight;
+    let highlighted = 0;
 
-    /* ظلل آخر N صفوف (اللي اتضافت) */
-    for(let i = start; i < rows.length; i++){
-      rows[i].classList.add('highlight-new');
-    }
-
-    /* حاول كمان تطابق النص في الخلايا */
-    if(chgData.lastRow){
-      const parts = chgData.lastRow.split('|').map(s => s.trim()).filter(Boolean);
-      for(const p of parts){
-        if(p.length < 3) continue;
-        let found = 0;
-        for(let i = start; i < rows.length; i++){
-          const cells = rows[i].querySelectorAll('td, th');
-          for(const cell of cells){
-            if((cell.textContent || '').trim().includes(p)){
-              rows[i].classList.add('highlight-new');
-              found++;
-              break;
-            }
+    /* 1. دور على order_no متطابقة في الخلايا */
+    const orders = (chgData.newOrders || []).filter(Boolean);
+    for(const ord of orders){
+      for(const row of rows){
+        const cells = row.querySelectorAll('td, th');
+        for(const cell of cells){
+          if((cell.textContent || '').trim() === ord){
+            row.classList.add('highlight-new');
+            highlighted++;
+            break;
           }
-          if(found >= numToHighlight) break;
         }
       }
     }
 
-    /* لف للجدول */
+    /* 2. لو ما لقاش، دور على آخر صفوف في RAW */
+    if(!highlighted && chgData.lastRow){
+      const parts = chgData.lastRow.split('|').map(s => s.trim()).filter(s => s.length > 3);
+      for(const p of parts){
+        for(const row of rows){
+          const cells = row.querySelectorAll('td, th');
+          for(const cell of cells){
+            if((cell.textContent || '').includes(p)){
+              row.classList.add('highlight-new');
+              highlighted++;
+              break;
+            }
+          }
+          if(highlighted >= 3) break;
+        }
+        if(highlighted) break;
+      }
+    }
+
+    /* 3. لو لسه ما لقاش، ظلل أول صفوف (الأحدث) */
+    if(!highlighted){
+      const n = Math.max(1, chgData.added > 0 ? chgData.added : 3);
+      for(let i = 0; i < Math.min(n, rows.length); i++){
+        rows[i].classList.add('highlight-new');
+        highlighted++;
+      }
+    }
+
     table.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    showNotifBanner('✨ تم إظهار ' + numToHighlight + ' سجل جديد', 'info');
+    if(highlighted) showNotifBanner('🚨 تم إظهار ' + highlighted + ' سجل', 'info');
   };
 
-  doHighlight();
+  doHL();
 }
 
 /* ========== البنر ========== */
@@ -208,14 +227,14 @@ function startSWKeepAlive(){
 
 /* ========== إعادة تعيين ========== */
 function resetApp(){
-  Object.keys(localStorage).filter(k => !k.startsWith('mmp_')).forEach(k => localStorage.removeItem(k));
+  Object.keys(localStorage).forEach(k => { if(!k.startsWith('mmp_')) localStorage.removeItem(k); });
   if('caches' in window) caches.keys().then(names => Promise.all(names.map(n => caches.delete(n)))).catch(() => {});
   if('serviceWorker' in navigator) navigator.serviceWorker.getRegistration().then(reg => { if(reg) reg.unregister(); }).catch(() => {});
   showNotifBanner('تم المسح، انتظر...', 'info');
   setTimeout(() => location.reload(), 1000);
 }
 
-/* حقن CSS التظليل */
+/* ========== حقن CSS ========== */
 (function injectCSS(){
   const style = document.createElement('style');
   style.textContent = `
@@ -226,10 +245,7 @@ function resetApp(){
       37% { background: rgba(155,140,242,0.5) !important; box-shadow: 0 0 25px rgba(155,140,242,0.6), inset 0 0 0 2px #9b8cf2 !important; }
       50% { background: rgba(242,103,139,0.5) !important; box-shadow: 0 0 25px rgba(242,103,139,0.6), inset 0 0 0 2px #f2678b !important; }
     }
-    .highlight-new {
-      animation: alarmBlink 1.2s ease-in-out 3 !important;
-      border-radius: 4px;
-    }
+    .highlight-new { animation: alarmBlink 1.2s ease-in-out 3 !important; border-radius: 4px; }
     #mmpNotifBtnInner:hover { transform:scale(1.1); }
     #mmpNotifBtnInner:active { transform:scale(0.95); }
   `;
