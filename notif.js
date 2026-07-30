@@ -129,8 +129,7 @@ function checkChanges(key, data, title, icon, pageUrl){
 /* ========== بصمة البيانات ========== */
 function getDataFingerprint(data){
   if(!data || !data.length) return '';
-  const rows = data.map(r => [r.date||'', r.order_no||'', r.product||'', r.qty_kg||0, r.customer||''].join('||')).join('\x01');
-  return data.length + '|' + rows;
+  return data.length + '|' + JSON.stringify(data);
 }
 
 /* ========== إظهار الصفوف الجديدة (تظليل إنذار) ========== */
@@ -146,7 +145,7 @@ function highlightRows(chgData){
       return;
     }
     const tbody = table.querySelector('tbody') || table;
-    const rows = [...tbody.querySelectorAll('tr')];
+    const rows = [...tbody.querySelectorAll('tr')].filter(r => !r.querySelector('th'));
     if(!rows.length){ showNotifBanner('📊 تم التحديث', 'info'); return; }
 
     let highlighted = 0;
@@ -154,15 +153,18 @@ function highlightRows(chgData){
     /* 1. دور على order_no متطابقة في الخلايا */
     const orders = (chgData.newOrders || []).filter(Boolean);
     for(const ord of orders){
+      const o = ord.trim();
       for(const row of rows){
         const cells = row.querySelectorAll('td, th');
         for(const cell of cells){
-          if((cell.textContent || '').trim() === ord){
+          const txt = (cell.textContent || '').trim();
+          if(txt === o || txt.includes(o) || o.includes(txt)){
             row.classList.add('highlight-new');
             highlighted++;
             break;
           }
         }
+        if(highlighted) break;
       }
     }
 
