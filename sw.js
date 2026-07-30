@@ -23,9 +23,7 @@ let bgInterval = null;
 
 self.addEventListener('install', e => {
   self.skipWaiting();
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(CORE_URLS))
-  );
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE_URLS)));
 });
 
 self.addEventListener('activate', e => {
@@ -98,19 +96,27 @@ async function checkCsvChange(entry){
       const prevRows = parseInt(prevFp.split('|')[0]) || 0;
       const added = newRows - prevRows;
       let detail = '📊 ' + entry.name;
-      if(added > 0){
-        detail += ': تمت إضافة ' + added + ' سجل';
-        if(newLast) detail += '\nآخر إدخال: ' + newLast;
-      } else if(added < 0){
-        detail += ': تم حذف ' + Math.abs(added) + ' سجل';
-      } else {
-        detail += ': تم تعديل البيانات';
-      }
+      if(added > 0) detail += ': تمت إضافة ' + added + ' سجل' + (newLast ? '\nآخر إدخال: ' + newLast : '');
+      else if(added < 0) detail += ': تم حذف ' + Math.abs(added) + ' سجل';
+      else detail += ': تم تعديل البيانات';
+
+      /* تخزين تفاصيل التغيير لإرسالها للصفحة عند الضغط */
+      const changeKey = 'chg-' + entry.key + '-' + ts;
+      const changeData = {
+        sheet: entry.name,
+        key: entry.key,
+        page: entry.page,
+        added: added,
+        lastRow: newLast,
+        time: ts
+      };
+      cache.put(new Request('chg-' + entry.key), new Response(JSON.stringify(changeData)));
+
       self.registration.showNotification('المنيف للأنابيب', {
         body: detail,
         icon: 'icon-192.png',
-        tag: 'chg-' + entry.key + '-' + ts,
-        data: { url: entry.page, sheet: entry.name },
+        tag: changeKey,
+        data: { url: entry.page, sheet: entry.name, chgKey: entry.key },
         requireInteraction: true,
         vibrate: [200, 100, 200],
         silent: false,
@@ -121,9 +127,7 @@ async function checkCsvChange(entry){
       });
     }
     cache.put(prevReq, new Response(fp));
-  }catch(e){
-    /* silent */
-  }
+  }catch(e){}
 }
 
 /* ---------- Push Event ---------- */
@@ -131,22 +135,20 @@ self.addEventListener('push', e => {
   let title = 'المنيف للأنابيب';
   let body = 'تحديث في البيانات';
   let targetUrl = 'OVERVIEW.html';
+  let chgData = null;
   try{
     if(e.data){
       const d = e.data.json();
       if(d.title) title = d.title;
       if(d.body) body = d.body;
       if(d.url) targetUrl = d.url;
+      if(d.chgData) chgData = d.chgData;
     }
   }catch(_){}
   self.registration.showNotification(title, {
-    body,
-    icon: 'icon-192.png',
-    tag: 'push-' + Date.now(),
-    data: { url: targetUrl },
-    requireInteraction: true,
-    vibrate: [200, 100, 200],
-    silent: false,
+    body, icon: 'icon-192.png', tag: 'push-' + Date.now(),
+    data: { url: targetUrl, chgData: chgData },
+    requireInteraction: true, vibrate: [200, 100, 200], silent: false,
     actions: [
       { action: 'open', title: 'فتح التطبيق' },
       { action: 'close', title: 'تجاهل' }
@@ -158,14 +160,8 @@ self.addEventListener('push', e => {
 self.addEventListener('message', e => {
   const data = e.data;
   if(!data) return;
-  if(data.type === 'keepalive'){
-    scheduleBgCheck();
-    return;
-  }
-  if(data.type === 'check-now'){
-    checkAllChanges();
-    return;
-  }
+  if(data.type === 'keepalive'){ scheduleBgCheck(); return; }
+  if(data.type === 'check-now'){ checkAllChanges(); return; }
   if(data.type === 'store-fp' && data.key && data.fp){
     caches.open(CACHE).then(c => c.put(new Request('fp-' + data.key), new Response(data.fp)));
     checkAllChanges();
@@ -173,13 +169,10 @@ self.addEventListener('message', e => {
   }
   if(data.type === 'show-notif' && data.title && data.body){
     self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: data.icon || 'icon-192.png',
+      body: data.body, icon: data.icon || 'icon-192.png',
       tag: data.tag || 'msg-' + Date.now(),
-      data: { url: data.url || '' },
-      requireInteraction: true,
-      vibrate: [200, 100, 200],
-      silent: false,
+      data: { url: data.url || '', chgKey: data.chgKey || '' },
+      requireInteraction: true, vibrate: [200, 100, 200], silent: false,
       actions: [
         { action: 'open', title: 'فتح' },
         { action: 'close', title: 'تجاهل' }
@@ -191,48 +184,34 @@ self.addEventListener('message', e => {
 
 /* ---------- Sync / Periodic Sync ---------- */
 self.addEventListener('sync', e => {
-  if(e.tag === 'check-changes'){
-    e.waitUntil(checkAllChanges());
-  }
+  if(e.tag === 'check-changes') e.waitUntil(checkAllChanges());
 });
-
 self.addEventListener('periodicsync', e => {
-  if(e.tag === 'check-changes'){
-    e.waitUntil(checkAllChanges());
-  }
+  if(e.tag === 'check-changes') e.waitUntil(checkAllChanges());
 });
 
 /* ---------- Fetch ---------- */
 self.addEventListener('fetch', e => {
   const url = e.request.url;
-
   if (url.includes('google.com') || url.includes('googleapis.com') || url.includes('gstatic.com')) {
-    e.respondWith(
-      fetch(e.request).catch(() => new Response('', { status: 503 }))
-    );
+    e.respondWith(fetch(e.request).catch(() => new Response('', { status: 503 })));
     return;
   }
-
   if (url.includes('fonts.googleapis.com')) {
-    e.respondWith(
-      caches.match(e.request).then(r => r || fetch(e.request).then(res => {
-        const copy = res.clone();
-        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, copy));
-        return res;
-      }))
-    );
+    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+      const copy = res.clone();
+      if (res.ok) caches.open(CACHE).then(c => c.put(e.request, copy));
+      return res;
+    })));
     return;
   }
-
-  e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).then(res => {
-      if (res.ok && e.request.method === 'GET') {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy));
-      }
-      return res;
-    }).catch(() => caches.match('OVERVIEW.html')))
-  );
+  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+    if (res.ok && e.request.method === 'GET') {
+      const copy = res.clone();
+      caches.open(CACHE).then(c => c.put(e.request, copy));
+    }
+    return res;
+  }).catch(() => caches.match('OVERVIEW.html'))));
 });
 
 /* ---------- Notification Click ---------- */
@@ -240,17 +219,33 @@ self.addEventListener('notificationclick', e => {
   if(e.action === 'close'){ e.notification.close(); return; }
   e.notification.close();
   const targetUrl = (e.notification.data && e.notification.data.url) || 'OVERVIEW.html';
-  const sheetName = (e.notification.data && e.notification.data.sheet) || '';
+  const chgKey = (e.notification.data && e.notification.data.chgKey) || '';
+
   e.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cls => {
+    (async () => {
+      /* استرداد تفاصيل التغيير من الكاش */
+      let chgData = null;
+      if(chgKey){
+        try{
+          const cache = await caches.open(CACHE);
+          const chgRes = await cache.match(new Request('chg-' + chgKey));
+          if(chgRes) chgData = await chgRes.json();
+        }catch(_){}
+      }
+      /* فتح أو التركيز على الصفحة */
+      const cls = await clients.matchAll({ type: 'window', includeUncontrolled: true });
       for(const c of cls){
         if(c.url && c.url.includes(targetUrl)){
           c.focus();
-          if(sheetName) c.postMessage({ type: 'focus-sheet', sheet: sheetName });
+          if(chgData) c.postMessage({ type: 'highlight-changes', chgData });
           return;
         }
       }
-      clients.openWindow(targetUrl);
-    })
+      const newClient = await clients.openWindow(targetUrl);
+      if(newClient && chgData){
+        /* انتظر تحميل الصفحة ثم أرسل التغييرات */
+        newClient.postMessage({ type: 'highlight-changes', chgData });
+      }
+    })()
   );
 });

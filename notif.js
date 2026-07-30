@@ -1,6 +1,27 @@
 var _swKeepAlive = null;
+var _lastChg = null;
 
-/* ---------- المستمع للرسائل الواردة من Service Worker ---------- */
+/* ========== فلوتنج بزر الإشعارات (فوق اليسار) ========== */
+(function injectNotifBtn(){
+  const div = document.createElement('div');
+  div.id = 'mmpNotifBtn';
+  div.innerHTML = '<button id="mmpNotifBtnInner" title="تفعيل الإشعارات" style="background:var(--teal,#2dd4bf);color:#000;width:40px;height:40px;border:none;border-radius:50%;font-size:20px;cursor:pointer;box-shadow:0 2px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;transition:transform .2s">🔔</button>';
+  div.style.cssText = 'position:fixed;top:10px;left:10px;z-index:9999;';
+  document.addEventListener('DOMContentLoaded', () => {
+    document.body.appendChild(div);
+    document.getElementById('mmpNotifBtnInner').onclick = function(){
+      if(!('Notification' in window)) return;
+      Notification.requestPermission().then(p => {
+        if(p === 'granted') this.textContent = '✅';
+      });
+    };
+    if('Notification' in window && Notification.permission === 'granted'){
+      document.getElementById('mmpNotifBtnInner').textContent = '✅';
+    }
+  });
+})();
+
+/* ========== المستمع لرسائل SW ========== */
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message', e => {
     const d = e.data;
@@ -8,53 +29,52 @@ if('serviceWorker' in navigator){
     if(d.type === 'focus-sheet' && d.sheet){
       showNotifBanner('📊 فتح بيانات ' + d.sheet, 'info');
     }
+    if(d.type === 'highlight-changes' && d.chgData){
+      _lastChg = d.chgData;
+      highlightRows(d.chgData);
+    }
   });
 }
 
 /* ========== الإذن ========== */
 function requestNotifPermission(){
-  const n = ('Notification' in window);
-  if(!n) return;
-  if(Notification.permission === 'granted') return;
+  if(!('Notification' in window)) return;
+  if(Notification.permission === 'granted'){
+    const btn = document.getElementById('mmpNotifBtnInner');
+    if(btn) btn.textContent = '✅';
+    return;
+  }
   if(Notification.permission === 'denied'){
-    console.warn('⚠️ الإشعارات مرفوضة. اذهب إلى إعدادات الموقع وافتح الإذن.');
     showNotifBanner('⚠️ الإشعارات مرفوضة — اذهب إلى إعدادات الموقع واسمح بها', 'warn');
     return;
   }
-  /* default — اطلب الإذن الآن */
   Notification.requestPermission().then(p => {
     if(p === 'granted'){
-      showNotifBanner('✅ تم قبول الإشعارات', 'info');
-    } else {
-      showNotifBanner('⚠️ تم رفض الإشعارات — لو عايز تغير رأيك، اذهب إلى إعدادات الموقع', 'warn');
+      const btn = document.getElementById('mmpNotifBtnInner');
+      if(btn) btn.textContent = '✅';
     }
   }).catch(() => {});
 }
 
-/* زر طلب الإذن (للاستخدام مع onclick) */
 function requestNotifPermissionClick(){
   if(!('Notification' in window)) return;
   Notification.requestPermission().then(p => {
     if(p === 'granted'){
+      const btn = document.getElementById('mmpNotifBtnInner');
+      if(btn) btn.textContent = '✅';
       showNotifBanner('✅ تم تفعيل الإشعارات', 'info');
     }
   }).catch(() => {});
 }
 
-/* ========== البصمة ========== */
+/* ========== بصمة البيانات ========== */
 function getDataFingerprint(data){
   if(!data || !data.length) return '';
-  const rows = data.map(r => [
-    r.date || '',
-    r.order_no || '',
-    r.product || '',
-    r.qty_kg || 0,
-    r.customer || ''
-  ].join('||')).join('\x01');
+  const rows = data.map(r => [r.date||'', r.order_no||'', r.product||'', r.qty_kg||0, r.customer||''].join('||')).join('\x01');
   return data.length + '|' + rows;
 }
 
-/* ========== الفحص ========== */
+/* ========== فحص التغيير ========== */
 function checkChanges(key, data, title, icon, pageUrl){
   if(!data || !data.length) return;
   const prev = localStorage.getItem(key);
@@ -81,15 +101,69 @@ function checkChanges(key, data, title, icon, pageUrl){
     detail = 'تم حذف ' + Math.abs(diff) + ' سجل';
   }
 
-  /* إرسال الإشعار عن طريق Service Worker (يدعم الخلفية والموبايل) */
+  /* إظهار الصفوف الجديدة في الصفحة الحالية */
+  const chgData = {
+    sheet: title || '',
+    key: key, page: pageUrl || '',
+    added: diff, lastRow: lastRow ? ((lastRow.date||'') + ' | ' + (lastRow.product||'') + ' | ' + (lastRow.order_no||'')) : '',
+    time: Date.now()
+  };
+  _lastChg = chgData;
+  setTimeout(() => highlightRows(chgData), 500);
+
   sendToSW('show-notif', {
     title: title || 'المنيف للأنابيب',
-    body: detail,
-    icon: icon || 'icon-192.png',
+    body: detail, icon: icon || 'icon-192.png',
     tag: 'page-' + key + '-' + Date.now(),
     url: pageUrl || ''
   });
   showNotifBanner('🔔 ' + detail, 'info');
+}
+
+/* ========== إظهار الصفوف الجديدة ========== */
+function highlightRows(chgData){
+  if(!chgData) return;
+  const table = document.querySelector('table');
+  if(!table){ showNotifBanner('📊 تم التحديث — روح إلى التقرير', 'info'); return; }
+  const tbody = table.querySelector('tbody') || table;
+  const rows = tbody.querySelectorAll('tr');
+  if(!rows.length) return;
+
+  /* إزالة التظليل القديم */
+  document.querySelectorAll('.highlight-new').forEach(el => {
+    el.classList.remove('highlight-new');
+  });
+
+  let highlightCount = 0;
+  const last = chgData.lastRow || '';
+  const searchStr = last.replace(/\s*\|\s*/g, ' ').trim();
+
+  if(searchStr){
+    for(let i = rows.length - 1; i >= 0; i--){
+      const text = rows[i].textContent || '';
+      if(text.includes(searchStr)){
+        rows[i].classList.add('highlight-new');
+        highlightCount++;
+        if(highlightCount >= (chgData.added > 0 ? chgData.added : 3)) break;
+      }
+    }
+  }
+
+  /* لو ما لقتش مطابقة، ظلل آخر X صفوف */
+  if(!highlightCount && chgData.added > 0){
+    const start = Math.max(0, rows.length - chgData.added);
+    for(let i = start; i < rows.length; i++){
+      rows[i].classList.add('highlight-new');
+      highlightCount++;
+    }
+  }
+
+  /* لفّ للجدول */
+  table.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  if(highlightCount > 0){
+    showNotifBanner('✨ تم إظهار ' + highlightCount + ' سجل جديد', 'info');
+  }
 }
 
 /* ========== البنر ========== */
@@ -103,35 +177,42 @@ function showNotifBanner(msg, type){
   el._hide = setTimeout(() => { el.style.display = 'none'; }, 6000);
 }
 
-/* ========== التواصل مع Service Worker ========== */
+/* ========== التواصل مع SW ========== */
 function sendToSW(type, payload){
   if(!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.ready.then(reg => {
-    if(reg.active){
-      reg.active.postMessage({ type: type, ...payload });
-    }
+    if(reg.active) reg.active.postMessage({ type: type, ...payload });
   }).catch(() => {});
 }
 
 function startSWKeepAlive(){
   clearInterval(_swKeepAlive);
-  _swKeepAlive = setInterval(() => {
-    sendToSW('keepalive');
-  }, 45000);
+  _swKeepAlive = setInterval(() => { sendToSW('keepalive'); }, 45000);
 }
 
-/* ========== إعادة تعيين كامل ========== */
+/* ========== إعادة تعيين ========== */
 function resetApp(){
-  const keys = Object.keys(localStorage).filter(k => k.startsWith('fp-') || k === 'mmp_fp' || k.startsWith('prod') || k.startsWith('scrap') || k.startsWith('lab') || k.startsWith('raw') || k.startsWith('overview'));
-  keys.forEach(k => localStorage.removeItem(k));
-  if('caches' in window){
-    caches.keys().then(names => Promise.all(names.map(n => caches.delete(n)))).catch(() => {});
-  }
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.getRegistration().then(reg => {
-      if(reg) reg.unregister();
-    }).catch(() => {});
-  }
-  showNotifBanner('تم مسح التطبيق، انتظر إعادة التحميل...', 'info');
+  Object.keys(localStorage).filter(k => !k.startsWith('mmp_')).forEach(k => localStorage.removeItem(k));
+  if('caches' in window) caches.keys().then(names => Promise.all(names.map(n => caches.delete(n)))).catch(() => {});
+  if('serviceWorker' in navigator) navigator.serviceWorker.getRegistration().then(reg => { if(reg) reg.unregister(); }).catch(() => {});
+  showNotifBanner('تم المسح، انتظر...', 'info');
   setTimeout(() => location.reload(), 1000);
 }
+
+/* حقن CSS التظليل */
+(function injectCSS(){
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes highlightPulse {
+      0% { background: rgba(45,212,191,0.3); box-shadow: inset 0 0 0 2px rgba(45,212,191,0.6); }
+      50% { background: rgba(45,212,191,0.15); }
+      100% { background: transparent; box-shadow: none; }
+    }
+    .highlight-new {
+      animation: highlightPulse 3s ease-out forwards;
+    }
+    #mmpNotifBtnInner:hover { transform:scale(1.1); }
+    #mmpNotifBtnInner:active { transform:scale(0.95); }
+  `;
+  document.head.appendChild(style);
+})();
