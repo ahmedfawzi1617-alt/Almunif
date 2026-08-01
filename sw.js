@@ -1,6 +1,7 @@
-const CACHE = 'mmp-cache-v5';
+const CACHE = 'mmp-cache-v6';
 const CORE_URLS = [
   'OVERVIEW.html',
+  'Orders.html',
   'Production.html',
   'scrap_dashboard.html',
   'LAB.html',
