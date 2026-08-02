@@ -108,7 +108,7 @@ function checkChanges(key, data, title, icon, pageUrl){
   /* بيانات التغيير */
   const diff = data.length - parseInt(prev.split('|')[0]) || 0;
   const lastRow = data[data.length - 1];
-  const cfg = VALUE_FIELD_MAP[key] || { field:null, unit:'', noun:'سجل' };
+  const cfg = VALUE_FIELD_MAP['sw-' + key] || { field:null, unit:'', noun:'سجل' };
 
   let detail = 'تم تعديل البيانات';
   if(diff > 0){
