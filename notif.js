@@ -1,6 +1,18 @@
 var _swKeepAlive = null;
 var _lastChg = null;
 
+/* ========== خريطة "الرقم المهم" لكل شيت — عشان الإشعار يوري القيمة الفعلية مش بس عدد السجلات ========== */
+var VALUE_FIELD_MAP = {
+  'sw-prod':  { field:'qty_kg',  unit:'كجم', noun:'عملية إنتاج' },
+  'sw-scrap': { field:'weight',  unit:'كجم', noun:'عملية هالك'  },
+  'sw-lab':   { field:null,      unit:'',    noun:'اختبار'      },
+  'sw-raw':   { field:null,      unit:'',    noun:'عينة'        }
+};
+function fmtNum(n){
+  if(n === null || n === undefined || isNaN(n)) return '';
+  return Math.round(n * 10) / 10;
+}
+
 /* ========== فلوتنج بزر الإشعارات ========== */
 (function injectNotifBtn(){
   const div = document.createElement('div');
@@ -96,16 +108,38 @@ function checkChanges(key, data, title, icon, pageUrl){
   /* بيانات التغيير */
   const diff = data.length - parseInt(prev.split('|')[0]) || 0;
   const lastRow = data[data.length - 1];
+  const cfg = VALUE_FIELD_MAP[key] || { field:null, unit:'', noun:'سجل' };
+
   let detail = 'تم تعديل البيانات';
   if(diff > 0){
-    detail = 'تمت إضافة ' + diff + ' سجل';
-    const extra = [];
-    if(lastRow.date) extra.push(lastRow.date);
-    if(lastRow.order_no) extra.push(lastRow.order_no);
-    if(lastRow.product) extra.push(lastRow.product);
-    if(extra.length) detail += '\n' + extra.slice(0,3).join(' | ');
+    /* الصفوف الجديدة (افتراض إن البيانات بتتضاف في الآخر) */
+    const newRows = data.slice(-diff);
+
+    if(cfg.field){
+      const sum = newRows.reduce((s,r) => s + (parseFloat(r[cfg.field]) || 0), 0);
+      detail = 'تمت إضافة ' + diff + ' ' + cfg.noun +
+               (sum ? ' — إجمالي ' + fmtNum(sum) + ' ' + cfg.unit : '');
+      const bits = [];
+      if(lastRow.product_type) bits.push(lastRow.product_type);
+      if(lastRow.machine) bits.push(lastRow.machine);
+      if(lastRow.customer) bits.push(lastRow.customer);
+      if(lastRow.defect_ar) bits.push(lastRow.defect_ar);
+      const lastVal = parseFloat(lastRow[cfg.field]);
+      if(!isNaN(lastVal)) bits.push(fmtNum(lastVal) + ' ' + cfg.unit);
+      if(bits.length) detail += '\nآخر إدخال: ' + bits.slice(0,4).join(' — ');
+    }else{
+      /* شيتات من غير رقم واحد واضح (زي المعملي/الخام) — نوري أهم تفاصيل آخر صف بدل كده */
+      detail = 'تمت إضافة ' + diff + ' ' + cfg.noun;
+      const bits = [];
+      if(lastRow.date) bits.push(lastRow.date);
+      if(lastRow.order_no) bits.push(lastRow.order_no);
+      if(lastRow.product) bits.push(lastRow.product);
+      if(lastRow.grade) bits.push(lastRow.grade);
+      if(lastRow.overall_result) bits.push(String(lastRow.overall_result).toUpperCase());
+      if(bits.length) detail += '\n' + bits.slice(0,3).join(' | ');
+    }
   } else if(diff < 0){
-    detail = 'تم حذف ' + Math.abs(diff) + ' سجل';
+    detail = 'تم حذف ' + Math.abs(diff) + ' ' + cfg.noun;
   }
 
   let lastRowStr = '';
@@ -146,9 +180,15 @@ function getDataFingerprint(data){
 }
 
 /* ========== إظهار الصفوف الجديدة (تظليل إنذار) ========== */
+function markRow(row){
+  row.classList.add('highlight-new', 'highlight-settled');
+  clearTimeout(row._settledTimer);
+  row._settledTimer = setTimeout(() => row.classList.remove('highlight-settled'), 20000);
+}
 function highlightRows(chgData){
   if(!chgData) return;
   document.querySelectorAll('.highlight-new').forEach(el => el.classList.remove('highlight-new'));
+  document.querySelectorAll('.highlight-settled').forEach(el => el.classList.remove('highlight-settled'));
   if(window._hlRetry){ clearTimeout(window._hlRetry); window._hlRetry = null; }
 
     const doHL = () => {
@@ -178,7 +218,7 @@ function highlightRows(chgData){
           for(const cell of cells){
             const txt = (cell.textContent || '').trim();
             if(txt === p || txt.includes(p) || p.includes(txt)){
-              row.classList.add('highlight-new');
+              markRow(row);
               highlighted++;
               break;
             }
@@ -198,7 +238,7 @@ function highlightRows(chgData){
           const cells = row.querySelectorAll('td');
           for(const cell of cells){
             if((cell.textContent || '').includes(p)){
-              row.classList.add('highlight-new');
+              markRow(row);
               highlighted++;
               break;
             }
@@ -213,7 +253,7 @@ function highlightRows(chgData){
     if(!highlighted){
       const n = Math.max(1, chgData.added > 0 ? chgData.added : 3);
       for(let i = 0; i < Math.min(n, rows.length); i++){
-        rows[i].classList.add('highlight-new');
+        markRow(rows[i]);
         highlighted++;
       }
     }
@@ -269,7 +309,20 @@ function resetApp(){
       37% { background: rgba(155,140,242,0.5) !important; box-shadow: 0 0 25px rgba(155,140,242,0.6), inset 0 0 0 2px #9b8cf2 !important; }
       50% { background: rgba(242,103,139,0.5) !important; box-shadow: 0 0 25px rgba(242,103,139,0.6), inset 0 0 0 2px #f2678b !important; }
     }
-    .highlight-new { animation: alarmBlink 1.2s ease-in-out 3 !important; border-radius: 4px; }
+    .highlight-new { animation: alarmBlink 1.2s ease-in-out 3 !important; border-radius: 4px; position: relative; }
+    .highlight-settled {
+      box-shadow: inset 3px 0 0 0 #2dd4bf !important;
+      background: rgba(45,212,191,0.08) !important;
+      position: relative;
+    }
+    .highlight-settled td:first-child{ position: relative; }
+    .highlight-settled td:first-child::before {
+      content: 'جديد';
+      position: absolute; top: 2px; right: 2px;
+      background: #2dd4bf; color: #04211d;
+      font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 8px;
+      line-height: 1.4; z-index: 2;
+    }
     #mmpNotifBtnInner:hover { transform:scale(1.1); }
     #mmpNotifBtnInner:active { transform:scale(0.95); }
   `;

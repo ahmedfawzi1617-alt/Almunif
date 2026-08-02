@@ -1,7 +1,8 @@
-const CACHE = 'mmp-cache-v6';
+importScripts('https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js');
+
+const CACHE = 'mmp-cache-v5';
 const CORE_URLS = [
   'OVERVIEW.html',
-  'Orders.html',
   'Production.html',
   'scrap_dashboard.html',
   'LAB.html',
@@ -12,7 +13,6 @@ const CORE_URLS = [
 ];
 
 const CSV_URLS = [
-  { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRy9XHGoK6iYQSRku-7qWDSaUveGXT1ZjpjRa2Av0cBrsXeljctBGdF7AHOoKaSgoi7Nz2g6djTTZxC/pub?gid=532084524&single=true&output=csv', name: 'أوردرات', key: 'sw-orders', page: 'Orders.html' },
   { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRy9XHGoK6iYQSRku-7qWDSaUveGXT1ZjpjRa2Av0cBrsXeljctBGdF7AHOoKaSgoi7Nz2g6djTTZxC/pub?gid=390647355&single=true&output=csv', name: 'إنتاج', key: 'sw-prod', page: 'Production.html' },
   { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRy9XHGoK6iYQSRku-7qWDSaUveGXT1ZjpjRa2Av0cBrsXeljctBGdF7AHOoKaSgoi7Nz2g6djTTZxC/pub?gid=1615042796&single=true&output=csv', name: 'هالك', key: 'sw-scrap', page: 'scrap_dashboard.html' },
   { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQiYC7XUuYzsqOQkKtxFH667BvpK0sroldpVvGwJ-V4r0bfbA2-ar-ZlsBPyBLcMBDsi5EKFwWTmxC/pub?gid=1555908756&single=true&output=csv', name: 'معمل', key: 'sw-lab', page: 'LAB.html' },
@@ -20,6 +20,25 @@ const CSV_URLS = [
 ];
 
 const VAPID_PUBLIC_KEY = 'BFe0Pj5XJd_J_XKStHr4QOBXHqDSqk01A8lGcQqMLBSYkH5sRc_c5r4P7phBO8rBDJFQLQ9FG8DJQqGU82BS0ik';
+
+/* خريطة "الرقم المهم" لكل شيت — بأسماء الأعمدة الحقيقية في ملف الإكسل/الشيت */
+const VALUE_FIELD_MAP = {
+  'sw-prod':  { fields:['Pro. Quantity Kg','pro. quantity kg'], unit:'كجم', noun:'عملية إنتاج' },
+  'sw-scrap': { fields:['defect weight (Kg)','scrap'],          unit:'كجم', noun:'عملية هالك'  },
+  'sw-lab':   { fields:null,                                    unit:'',    noun:'اختبار'      },
+  'sw-raw':   { fields:null,                                    unit:'',    noun:'عينة'        }
+};
+function pickField(row, names){
+  for(const n of names){ if(row[n] !== undefined && row[n] !== '') return row[n]; }
+  const norm = s => String(s).replace(/\s+/g,' ').trim().toLowerCase();
+  for(const n of names){
+    const t = norm(n);
+    const k = Object.keys(row).find(k => norm(k) === t);
+    if(k && row[k] !== '') return row[k];
+  }
+  return '';
+}
+function fmtNum(n){ return Math.round(n*10)/10; }
 
 let bgInterval = null;
 
@@ -66,17 +85,9 @@ async function checkAllChanges(){
   await Promise.allSettled(CSV_URLS.map(entry => checkCsvChange(entry)));
 }
 
-function countRows(text){
-  const lines = text.split('\n').filter(l => l.trim());
-  return Math.max(0, lines.length - 1);
-}
-
-function extractLastRow(text){
-  const lines = text.split('\n').filter(l => l.trim());
-  if(lines.length < 2) return '';
-  const last = lines[lines.length - 1];
-  const cols = last.split(',');
-  return cols[0] + (cols[2] ? ' | ' + cols[2] : '');
+function parseCsv(text){
+  const res = Papa.parse(text, { header: true, skipEmptyLines: true });
+  return res.data || [];
 }
 
 async function checkCsvChange(entry){
@@ -86,21 +97,59 @@ async function checkCsvChange(entry){
     const res = await fetch(entry.url + sep + 'ts=' + ts, { cache: 'no-store' });
     if(!res.ok) return;
     const text = await res.text();
-    const newRows = countRows(text);
-    const newLast = extractLastRow(text);
-    const fp = newRows + '|' + newLast + '|' + text.slice(0, 3000);
+    const rows = parseCsv(text);
+    const newRows = rows.length;
+
     const cache = await caches.open(CACHE);
     const prevReq = new Request('fp-' + entry.key);
     const prevRes = await cache.match(prevReq);
     const prevFp = prevRes ? await prevRes.text() : null;
+    const fp = newRows + '|' + text.slice(0, 4000);
 
     if(prevFp && prevFp !== fp){
       const prevRows = parseInt(prevFp.split('|')[0]) || 0;
       const added = newRows - prevRows;
+      const cfg = VALUE_FIELD_MAP[entry.key] || { fields:null, unit:'', noun:'سجل' };
+      const lastRow = rows[rows.length - 1] || {};
+
       let detail = '📊 ' + entry.name;
-      if(added > 0) detail += ': تمت إضافة ' + added + ' سجل' + (newLast ? '\nآخر إدخال: ' + newLast : '');
-      else if(added < 0) detail += ': تم حذف ' + Math.abs(added) + ' سجل';
-      else detail += ': تم تعديل البيانات';
+      if(added > 0){
+        const newAdded = rows.slice(-added);
+        if(cfg.fields){
+          const sum = newAdded.reduce((s,r) => s + (parseFloat(pickField(r, cfg.fields)) || 0), 0);
+          detail += ': تمت إضافة ' + added + ' ' + cfg.noun +
+                    (sum ? ' — إجمالي ' + fmtNum(sum) + ' ' + cfg.unit : '');
+          const lastVal = parseFloat(pickField(lastRow, cfg.fields));
+          const bits = [];
+          const pType = pickField(lastRow, ['product type','Product Type']);
+          const cust = pickField(lastRow, ['customer (vlook)','customer']);
+          const mach = pickField(lastRow, ['machine']);
+          if(pType) bits.push(pType);
+          if(mach) bits.push(mach);
+          if(cust) bits.push(cust);
+          if(!isNaN(lastVal)) bits.push(fmtNum(lastVal) + ' ' + cfg.unit);
+          if(bits.length) detail += '\nآخر إدخال: ' + bits.slice(0,4).join(' — ');
+        }else{
+          detail += ': تمت إضافة ' + added + ' ' + cfg.noun;
+          const bits = [];
+          const dt = pickField(lastRow, ['date','Date']);
+          const grade = pickField(lastRow, ['Raw material grade']);
+          const result = pickField(lastRow, ['Overall\nResult','Overall Result']);
+          if(dt) bits.push(dt);
+          if(grade) bits.push(grade);
+          if(result) bits.push(String(result).toUpperCase());
+          if(bits.length) detail += '\n' + bits.slice(0,3).join(' | ');
+        }
+      } else if(added < 0){
+        detail += ': تم حذف ' + Math.abs(added) + ' ' + cfg.noun;
+      } else {
+        detail += ': تم تعديل البيانات';
+      }
+
+      const lastRowSummary = [
+        pickField(lastRow, ['date','Date']),
+        pickField(lastRow, ['order number','Order number','order no'])
+      ].filter(Boolean).join(' | ');
 
       self.registration.showNotification('المنيف للأنابيب', {
         body: detail,
@@ -109,7 +158,7 @@ async function checkCsvChange(entry){
         data: {
           url: entry.page,
           sheet: entry.name,
-          chgData: { sheet: entry.name, key: entry.key, page: entry.page, added: added, lastRow: newLast, time: ts }
+          chgData: { sheet: entry.name, key: entry.key, page: entry.page, added: added, lastRow: lastRowSummary, time: ts }
         },
         requireInteraction: true,
         vibrate: [200, 100, 200],
