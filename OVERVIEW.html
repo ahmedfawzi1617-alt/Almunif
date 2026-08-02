@@ -332,13 +332,6 @@
     ⚠️ تعذّر تحميل بعض البيانات — جرب تحديث الصفحة.
   </div>
 
-  <div class="kpis" id="orderKpis">
-    <div class="kpi k1"><div class="label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>إجمالي الأوردرات</div><div class="value" id="kpiOrderTotal">—</div><div class="sub">من شيت متابعة الأوردرات</div></div>
-    <div class="kpi k2"><div class="label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>مكتمل</div><div class="value" id="kpiOrderDone">—</div><div class="sub" id="kpiOrderDoneSub">نسبة الإنجاز —</div></div>
-    <div class="kpi k3"><div class="label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>جاري التنفيذ</div><div class="value" id="kpiOrderPending">—</div><div class="sub">أوردرات لسه شغالة</div></div>
-    <div class="kpi k4"><div class="label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>نسبة الوزن المنجز</div><div class="value" id="kpiOrderWtPct">—</div><div class="sub">وزن منجز / مطلوب</div></div>
-  </div>
-
 
 
   <div class="overview-grid">
@@ -540,12 +533,6 @@ function renderOrdersKpis(rows){
     reqSum += req; doneSum += d;
   });
   const wtPct = reqSum ? (doneSum/reqSum*100) : 0;
-
-  document.getElementById('kpiOrderTotal').textContent = total.toLocaleString('en-US');
-  document.getElementById('kpiOrderDone').textContent = done.toLocaleString('en-US');
-  document.getElementById('kpiOrderDoneSub').textContent = 'نسبة الإنجاز ' + (total ? (done/total*100).toFixed(1) : 0) + '%';
-  document.getElementById('kpiOrderPending').textContent = pending.toLocaleString('en-US');
-  document.getElementById('kpiOrderWtPct').textContent = reqSum ? wtPct.toFixed(1)+'%' : '—';
 
   const elOvTotal = document.getElementById('ovOrderTotal');
   const elOvRate = document.getElementById('ovOrderDoneRate');
