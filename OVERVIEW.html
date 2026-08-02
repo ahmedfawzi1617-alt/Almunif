@@ -125,54 +125,55 @@
 
   /* ===== Overview cards ===== */
   .overview-grid{
-    display:grid; grid-template-columns:repeat(3, 1fr);
-    gap:16px;
-    max-width:1200px; margin:18px auto 30px;
+    display:grid; grid-template-columns:1fr;
+    gap:10px;
+    max-width:760px; margin:12px auto 24px;
   }
   .overview-card{
-    display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+    display:flex; flex-direction:row; align-items:center; gap:18px; text-align:right;
     text-decoration:none; color:var(--text-0);
-    background:var(--surface); border:1px solid var(--border); border-radius:20px;
-    padding:40px 24px; backdrop-filter:blur(20px); transition:.18s; position:relative; overflow:hidden;
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:10px 16px; backdrop-filter:blur(20px); transition:.18s; position:relative; overflow:hidden;
   }
   .overview-card::before{
-    content:''; position:absolute; inset:0 0 auto 0; height:4px;
-    background:linear-gradient(90deg, var(--oc, var(--teal)), transparent);
+    content:''; position:absolute; top:0; bottom:0; right:0; width:4px;
+    background:linear-gradient(180deg, var(--oc, var(--teal)), transparent);
     opacity:.7;
   }
-  .overview-card:hover{ border-color:var(--border-hi); background:var(--surface-hi); transform:translateY(-3px); box-shadow:0 10px 26px rgba(0,0,0,0.35); }
-  .overview-card h3{font-size:19px; font-weight:800; margin:0 0 20px; line-height:1.3; min-height:50px;}
+  .overview-card:hover{ border-color:var(--border-hi); background:var(--surface-hi); transform:translateY(-2px); box-shadow:0 10px 26px rgba(0,0,0,0.35); }
+  .overview-card h3{font-size:15px; font-weight:800; margin:0; line-height:1.3;}
 
   /* دائرة مركزية فيها الأيقونة */
   .oc-circle{
-    width:140px; height:140px; border-radius:50%;
+    width:52px; height:52px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
-    margin:0 0 22px; position:relative; flex-shrink:0;
+    margin:0; position:relative; flex-shrink:0;
     background:
       radial-gradient(circle at 30% 25%, rgba(255,255,255,0.16), transparent 55%),
       var(--oc-bg, var(--teal-dim));
     color:var(--oc, var(--teal));
-    border:3px solid var(--oc-bd, rgba(255,255,255,0.12));
+    border:2px solid var(--oc-bd, rgba(255,255,255,0.12));
     box-shadow:0 8px 22px rgba(0,0,0,0.25);
   }
   .oc-circle::after{
-    content:''; position:absolute; inset:-10px; border-radius:50%;
+    content:''; position:absolute; inset:-6px; border-radius:50%;
     border:1px dashed rgba(255,255,255,0.14);
   }
-  .oc-circle svg{width:60px; height:60px;}
+  .oc-circle svg{width:24px; height:24px;}
   .oc-green{ --oc:var(--teal); --oc-bg:var(--teal-dim); --oc-bd:rgba(45,212,191,0.35); }
   .oc-amber{ --oc:var(--amber); --oc-bg:var(--amber-dim); --oc-bd:rgba(242,169,59,0.35); }
   .oc-teal{ --oc:var(--teal); --oc-bg:var(--teal-dim); --oc-bd:rgba(45,212,191,0.35); }
   .oc-violet{ --oc:var(--violet); --oc-bg:var(--violet-dim); --oc-bd:rgba(155,140,242,0.35); }
 
-  .oc-stat{ display:flex; align-items:baseline; justify-content:center; gap:8px; width:100%; padding:6px 0; }
-  .oc-num{ font-size:27px; font-weight:800; font-variant-numeric:tabular-nums; }
-  .oc-lbl{ font-size:13px; color:var(--text-2); font-weight:600; }
-  .oc-go{ margin-top:12px; font-size:14px; font-weight:700; color:var(--text-1); }
+  .oc-body{ flex:1; min-width:0; }
+  .oc-stats{ display:flex; align-items:center; gap:18px; margin-top:4px; flex-wrap:wrap; }
+  .oc-stat{ display:flex; align-items:baseline; gap:6px; }
+  .oc-num{ font-size:18px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .oc-lbl{ font-size:11.5px; color:var(--text-2); font-weight:600; }
+  .oc-go{ margin-inline-start:auto; font-size:12px; font-weight:700; color:var(--text-1); white-space:nowrap; }
   .overview-card:hover .oc-go{ color:var(--oc, var(--teal)); }
 
-  @media (max-width:980px){ .overview-grid{grid-template-columns:repeat(2, 1fr);} }
-  @media (max-width:560px){ .overview-grid{grid-template-columns:1fr;} }
+  @media (max-width:560px){ .overview-card{flex-wrap:wrap;} }
   .kpi{
     background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
     padding:18px 20px; backdrop-filter:blur(20px); position:relative; overflow:hidden;
@@ -362,42 +363,62 @@
   <div class="overview-grid">
 
     <a href="Production.html" class="overview-card">
-      <h3>الإنتاج</h3>
       <div class="oc-circle oc-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="7" width="15" height="13" rx="2"/><path d="M16 11l5-3v10l-5-3"/></svg></div>
-      <div class="oc-stat"><span class="oc-num" id="ovProdTotal">—</span><span class="oc-lbl">كجم إجمالي الإنتاج</span></div>
-      <div class="oc-stat"><span class="oc-num" id="ovProdOverWt" style="font-size:15px;">—</span><span class="oc-lbl">Over Weight</span></div>
+      <div class="oc-body">
+        <h3>الإنتاج</h3>
+        <div class="oc-stats">
+          <div class="oc-stat"><span class="oc-num" id="ovProdTotal">—</span><span class="oc-lbl">كجم إجمالي الإنتاج</span></div>
+          <div class="oc-stat"><span class="oc-num" id="ovProdOverWt" style="font-size:15px;">—</span><span class="oc-lbl">Over Weight</span></div>
+        </div>
+      </div>
       <div class="oc-go">افتح اللوحة ←</div>
     </a>
 
     <a href="scrap_dashboard.html" class="overview-card">
-      <h3>الهالك</h3>
       <div class="oc-circle oc-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18.7 8l-4.3 4.3-2.5-2.5L7 14.7"/></svg></div>
-      <div class="oc-stat"><span class="oc-num" id="ovScrapTotal">—</span><span class="oc-lbl">كجم إجمالي الهالك</span></div>
-      <div class="oc-stat"><span class="oc-num" id="ovScrapPct" style="font-size:20px;">—</span><span class="oc-lbl">نسبة الهالك</span></div>
+      <div class="oc-body">
+        <h3>الهالك</h3>
+        <div class="oc-stats">
+          <div class="oc-stat"><span class="oc-num" id="ovScrapTotal">—</span><span class="oc-lbl">كجم إجمالي الهالك</span></div>
+          <div class="oc-stat"><span class="oc-num" id="ovScrapPct" style="font-size:20px;">—</span><span class="oc-lbl">نسبة الهالك</span></div>
+        </div>
+      </div>
       <div class="oc-go">افتح اللوحة ←</div>
     </a>
 
     <a href="LAB.html" class="overview-card">
-      <h3>اختبارات المنتج النهائي</h3>
       <div class="oc-circle oc-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6l-5.5 9.5A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.5L14 9V3"/></svg></div>
-      <div class="oc-stat"><span class="oc-num" id="ovLabPass">—</span><span class="oc-lbl">نسبة النجاح</span></div>
-      <div class="oc-stat"><span class="oc-num" id="ovLabCount">—</span><span class="oc-lbl">عدد الاختبارات</span></div>
+      <div class="oc-body">
+        <h3>اختبارات المنتج النهائي</h3>
+        <div class="oc-stats">
+          <div class="oc-stat"><span class="oc-num" id="ovLabPass">—</span><span class="oc-lbl">نسبة النجاح</span></div>
+          <div class="oc-stat"><span class="oc-num" id="ovLabCount">—</span><span class="oc-lbl">عدد الاختبارات</span></div>
+        </div>
+      </div>
       <div class="oc-go">افتح اللوحة ←</div>
     </a>
 
     <a href="RAW.html" class="overview-card">
-      <h3>اختبارات المواد الخام</h3>
       <div class="oc-circle oc-violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></div>
-      <div class="oc-stat"><span class="oc-num" id="ovRawCount">—</span><span class="oc-lbl">عدد العينات</span></div>
-      <div class="oc-stat"><span class="oc-num" id="ovRawGrade" style="font-size:15px;">—</span><span class="oc-lbl">أكتر صنف</span></div>
+      <div class="oc-body">
+        <h3>اختبارات المواد الخام</h3>
+        <div class="oc-stats">
+          <div class="oc-stat"><span class="oc-num" id="ovRawCount">—</span><span class="oc-lbl">عدد العينات</span></div>
+          <div class="oc-stat"><span class="oc-num" id="ovRawGrade" style="font-size:15px;">—</span><span class="oc-lbl">أكتر صنف</span></div>
+        </div>
+      </div>
       <div class="oc-go">افتح اللوحة ←</div>
     </a>
 
     <a href="Orders.html" class="overview-card">
-      <h3>متابعة الأوردرات</h3>
       <div class="oc-circle oc-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
-      <div class="oc-stat"><span class="oc-num" id="ovOrderTotal">—</span><span class="oc-lbl">إجمالي الأوردرات</span></div>
-      <div class="oc-stat"><span class="oc-num" id="ovOrderDoneRate" style="font-size:20px;">—</span><span class="oc-lbl">نسبة الإنجاز</span></div>
+      <div class="oc-body">
+        <h3>متابعة الأوردرات</h3>
+        <div class="oc-stats">
+          <div class="oc-stat"><span class="oc-num" id="ovOrderTotal">—</span><span class="oc-lbl">إجمالي الأوردرات</span></div>
+          <div class="oc-stat"><span class="oc-num" id="ovOrderDoneRate" style="font-size:20px;">—</span><span class="oc-lbl">نسبة الإنجاز</span></div>
+        </div>
+      </div>
       <div class="oc-go">افتح اللوحة ←</div>
     </a>
 
