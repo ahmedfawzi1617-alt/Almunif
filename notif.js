@@ -108,7 +108,7 @@ function checkChanges(key, data, title, icon, pageUrl){
   /* بيانات التغيير */
   const diff = data.length - parseInt(prev.split('|')[0]) || 0;
   const lastRow = data[data.length - 1];
-  const cfg = VALUE_FIELD_MAP[key] || { field:null, unit:'', noun:'سجل' };
+  const cfg = VALUE_FIELD_MAP['sw-' + key] || { field:null, unit:'', noun:'سجل' };
 
   let detail = 'تم تعديل البيانات';
   if(diff > 0){
@@ -164,13 +164,35 @@ function checkChanges(key, data, title, icon, pageUrl){
   _lastChg = chgData;
   setTimeout(() => highlightRows(chgData), 800);
 
-  sendToSW('show-notif', {
-    title: title || 'المنيف للأنابيب',
-    body: detail, icon: icon || 'icon-192.png',
-    tag: 'page-' + key + '-' + Date.now(),
-    url: pageUrl || ''
+  /* لو الـ SW عمل إشعار للتغيير ده قبل كده، الصفحة ما تعملش إشعار مكرر */
+  swSeenCount(key).then(swCount => {
+    if(swCount === null || swCount < data.length){
+      sendToSW('show-notif', {
+        title: title || 'المنيف للأنابيب',
+        body: detail, icon: icon || 'icon-192.png',
+        tag: 'page-' + key + '-' + Date.now(),
+        url: pageUrl || ''
+      });
+      showNotifBanner('🔔 ' + detail, 'info');
+    }
   });
-  showNotifBanner('🔔 ' + detail, 'info');
+}
+
+/* عدد الصفوف اللي الـ SW شافها آخر مرة — من الكاش بتاعه */
+function swSeenCount(key){
+  if(!('caches' in window)) return Promise.resolve(null);
+  return caches.keys().then(names => {
+    for(const n of names){
+      if(n.indexOf('mmp-cache-') === 0){
+        return caches.open(n).then(c => c.match('fp-sw-' + key).then(r => r ? r.text() : null));
+      }
+    }
+    return null;
+  }).then(txt => {
+    if(!txt) return null;
+    const p = parseInt(txt.split('|')[0]);
+    return isNaN(p) ? null : p;
+  }).catch(() => null);
 }
 
 /* ========== بصمة البيانات ========== */
