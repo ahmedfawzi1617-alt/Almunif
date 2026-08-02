@@ -375,6 +375,14 @@
       <div class="oc-go">افتح اللوحة ←</div>
     </a>
 
+    <a href="Orders.html" class="overview-card">
+      <div class="oc-icon oc-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+      <h3>متابعة الأوردرات</h3>
+      <div class="oc-stat"><span class="oc-num" id="ovOrderTotal">—</span><span class="oc-lbl">إجمالي الأوردرات</span></div>
+      <div class="oc-stat"><span class="oc-num" id="ovOrderDoneRate" style="font-size:20px;">—</span><span class="oc-lbl">نسبة الإنجاز</span></div>
+      <div class="oc-go">افتح اللوحة ←</div>
+    </a>
+
   </div>
 
   <footer>نظرة عامة على كل لوحات المصنع · تحديث تلقائي كل 90 ثانية · مصنع المنيف للأنابيب</footer>
@@ -538,6 +546,11 @@ function renderOrdersKpis(rows){
   document.getElementById('kpiOrderDoneSub').textContent = 'نسبة الإنجاز ' + (total ? (done/total*100).toFixed(1) : 0) + '%';
   document.getElementById('kpiOrderPending').textContent = pending.toLocaleString('en-US');
   document.getElementById('kpiOrderWtPct').textContent = reqSum ? wtPct.toFixed(1)+'%' : '—';
+
+  const elOvTotal = document.getElementById('ovOrderTotal');
+  const elOvRate = document.getElementById('ovOrderDoneRate');
+  if(elOvTotal) elOvTotal.textContent = total.toLocaleString('en-US');
+  if(elOvRate) elOvRate.textContent = (total ? (done/total*100).toFixed(1) : 0) + '%';
 }
 
 function oPickRow(row, ...names){
