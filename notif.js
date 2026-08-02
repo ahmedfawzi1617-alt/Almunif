@@ -280,8 +280,10 @@ function highlightRows(chgData){
       }
     }
 
-    table.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if(highlighted) showNotifBanner('🚨 تم إظهار ' + highlighted + ' صف', 'info');
+    if(highlighted){
+      table.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      showNotifBanner('🚨 تم إظهار ' + highlighted + ' صف', 'info');
+    }
   };
 
   doHL();
