@@ -332,6 +332,13 @@
     ⚠️ تعذّر تحميل بعض البيانات — جرب تحديث الصفحة.
   </div>
 
+  <div class="kpis" id="orderKpis">
+    <div class="kpi k1"><div class="label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>إجمالي الأوردرات</div><div class="value" id="kpiOrderTotal">—</div><div class="sub">من شيت متابعة الأوردرات</div></div>
+    <div class="kpi k2"><div class="label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>مكتمل</div><div class="value" id="kpiOrderDone">—</div><div class="sub" id="kpiOrderDoneSub">نسبة الإنجاز —</div></div>
+    <div class="kpi k3"><div class="label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>جاري التنفيذ</div><div class="value" id="kpiOrderPending">—</div><div class="sub">أوردرات لسه شغالة</div></div>
+    <div class="kpi k4"><div class="label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>نسبة الوزن المنجز</div><div class="value" id="kpiOrderWtPct">—</div><div class="sub">وزن منجز / مطلوب</div></div>
+  </div>
+
 
 
   <div class="overview-grid">
@@ -381,6 +388,7 @@ const PRODUCTION_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRy9XHGo
 const SCRAP_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRy9XHGoK6iYQSRku-7qWDSaUveGXT1ZjpjRa2Av0cBrsXeljctBGdF7AHOoKaSgoi7Nz2g6djTTZxC/pub?gid=1615042796&single=true&output=csv";
 const LAB_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSQiYC7XUuYzsqOQkKtxFH667BvpK0sroldpVvGwJ-V4r0bfbA2-ar-ZlsBPyBLcMBDsi5EKFwWTmxC/pub?gid=1555908756&single=true&output=csv";
 const RAW_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSQiYC7XUuYzsqOQkKtxFH667BvpK0sroldpVvGwJ-V4r0bfbA2-ar-ZlsBPyBLcMBDsi5EKFwWTmxC/pub?gid=845489182&single=true&output=csv";
+const ORDERS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRy9XHGoK6iYQSRku-7qWDSaUveGXT1ZjpjRa2Av0cBrsXeljctBGdF7AHOoKaSgoi7Nz2g6djTTZxC/pub?gid=532084524&single=true&output=csv";
 const REFRESH_MS = 90000;
 
 function pick(row, ...names){
@@ -495,9 +503,52 @@ async function loadOverview(){
     document.getElementById('ovRawGrade').textContent = top ? top[0] : '—';
   }
 
+  // ===== متابعة الأوردرات =====
+  try{
+    const oRes = await fetch(ORDERS_CSV + '&ts=' + Date.now());
+    const oText = await oRes.text();
+    const oParsed = Papa.parse(oText, {header:true, skipEmptyLines:true}).data;
+    renderOrdersKpis(oParsed);
+  }catch(err){
+    console.error('فشل تحميل شيت الأوردرات:', err);
+  }
+
   document.getElementById('statusText').textContent = 'آخر تحديث: ' + new Date().toLocaleTimeString('ar-EG');
   document.getElementById('setupBanner').style.display = (prodRows && scrapRows && labRows && rawRows) ? 'none' : 'flex';
   checkChanges('overview', prodRows, 'إنتاج جديد', 'icon-192.png', 'OVERVIEW.html');
+}
+
+function renderOrdersKpis(rows){
+  if(!rows || !rows.length){ return; }
+
+  const total = rows.length;
+  const done = rows.filter(r=>{ const s=String(oPickRow(r,'done or ?','done or?')).toLowerCase(); return s.includes('done'); }).length;
+  const pending = total - done;
+
+  let reqSum = 0, doneSum = 0;
+  rows.forEach(r=>{
+    const req = parseFloat(oPickRow(r,'وزن الكمية المطلوبة','weight required'))||0;
+    const d = parseFloat(oPickRow(r,'actual done weight','Actual done weight','وزن الكمية المنجزة','weight done'))||0;
+    reqSum += req; doneSum += d;
+  });
+  const wtPct = reqSum ? (doneSum/reqSum*100) : 0;
+
+  document.getElementById('kpiOrderTotal').textContent = total.toLocaleString('en-US');
+  document.getElementById('kpiOrderDone').textContent = done.toLocaleString('en-US');
+  document.getElementById('kpiOrderDoneSub').textContent = 'نسبة الإنجاز ' + (total ? (done/total*100).toFixed(1) : 0) + '%';
+  document.getElementById('kpiOrderPending').textContent = pending.toLocaleString('en-US');
+  document.getElementById('kpiOrderWtPct').textContent = reqSum ? wtPct.toFixed(1)+'%' : '—';
+}
+
+function oPickRow(row, ...names){
+  for(const n of names){ if(row[n]!==undefined && row[n]!=='') return row[n]; }
+  const norm = s => String(s).replace(/\s+/g,' ').trim().toLowerCase();
+  for(const n of names){
+    const t = norm(n);
+    const k = Object.keys(row).find(k=>norm(k)===t);
+    if(k && row[k]!=='') return row[k];
+  }
+  return '';
 }
 
 loadOverview();
