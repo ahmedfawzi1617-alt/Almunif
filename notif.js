@@ -210,9 +210,10 @@ function markCell(el){
   el._settledTimer = setTimeout(() => el.classList.remove('highlight-settled'), 20000);
 }
 function markRow(row, chgData){
-  /* لو في قيمة رقمية محددة للصفوف الجديدة — حط الهالة على الخلية اللي محتواها القيمة دي */
+  const cells = [...row.querySelectorAll('td')];
+
+  /* 1. دور على الخلية اللي محتواها القيمة الرقمية المتعدلة بالظبط */
   if(chgData && chgData.fieldValues && chgData.fieldValues.length){
-    const cells = row.querySelectorAll('td');
     for(const cell of cells){
       const num = parseFloat((cell.textContent || '').replace(/,/g, '').replace(/%/g, ''));
       if(!isNaN(num) && chgData.fieldValues.some(v => Math.abs(num - v) < 0.01)){
@@ -221,6 +222,18 @@ function markRow(row, chgData){
       }
     }
   }
+
+  /* 2. لو مفيش تطابق — اختار أكبر رقم في الصف (الكمية/الوزن غالبًا) */
+  let best = null, bestVal = -1;
+  for(const cell of cells){
+    const txt = (cell.textContent || '').trim();
+    if(!/^[\d.,%]+$/.test(txt)) continue;
+    const num = parseFloat(txt.replace(/,/g, '').replace(/%/g, ''));
+    if(!isNaN(num) && num > bestVal){ best = cell; bestVal = num; }
+  }
+  if(best){ markCell(best); return; }
+
+  /* 3. آخر حل — الصف كله */
   markCell(row);
 }
 function highlightRows(chgData){
