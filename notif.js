@@ -357,6 +357,19 @@ function resetApp(){
       border-radius: 6px !important;
       font-weight: 800 !important;
     }
+    /* دائرة حمراء على الخلية الرقمية المتعدلة */
+    td.highlight-settled { position: relative !important; }
+    td.highlight-settled::after {
+      content: '●';
+      position: absolute; top: 2px; left: 2px;
+      color: #f2678b; font-size: 11px; line-height: 1;
+      text-shadow: 0 0 6px rgba(242,103,139,0.9);
+      animation: redDot 1s ease-in-out infinite;
+    }
+    @keyframes redDot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: .7; }
+    }
     /* الصف كامل (حالة احتياطية) */
     tr.highlight-settled {
       box-shadow: inset 3px 0 0 0 #2dd4bf !important;
@@ -370,6 +383,13 @@ function resetApp(){
       background: #2dd4bf; color: #04211d;
       font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 8px;
       line-height: 1.4; z-index: 2;
+    }
+    tr.highlight-settled td:first-child::after {
+      content: '●';
+      position: absolute; top: 2px; left: 2px;
+      color: #f2678b; font-size: 11px; line-height: 1;
+      text-shadow: 0 0 6px rgba(242,103,139,0.9);
+      animation: redDot 1s ease-in-out infinite;
     }
     #mmpNotifBtnInner:hover { transform:scale(1.1); }
     #mmpNotifBtnInner:active { transform:scale(0.95); }
