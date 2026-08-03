@@ -281,7 +281,6 @@ function highlightRows(chgData){
     }
 
     if(highlighted){
-      table.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       showNotifBanner('🚨 تم إظهار ' + highlighted + ' صف', 'info');
     }
   };
