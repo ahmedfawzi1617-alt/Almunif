@@ -159,6 +159,8 @@ function checkChanges(key, data, title, icon, pageUrl){
     added: diff,
     lastRow: lastRowStr,
     newIds: newIds.slice(-5),
+    field: cfg.field || null,
+    fieldValues: diff > 0 ? data.slice(-diff).map(r => parseFloat(r[cfg.field])).filter(v => v !== null && !isNaN(v)) : [],
     time: Date.now()
   };
   _lastChg = chgData;
@@ -202,10 +204,24 @@ function getDataFingerprint(data){
 }
 
 /* ========== إظهار الصفوف الجديدة (تظليل إنذار) ========== */
-function markRow(row){
-  row.classList.add('highlight-new', 'highlight-settled');
-  clearTimeout(row._settledTimer);
-  row._settledTimer = setTimeout(() => row.classList.remove('highlight-settled'), 20000);
+function markCell(el){
+  el.classList.add('highlight-new', 'highlight-settled');
+  clearTimeout(el._settledTimer);
+  el._settledTimer = setTimeout(() => el.classList.remove('highlight-settled'), 20000);
+}
+function markRow(row, chgData){
+  /* لو في قيمة رقمية محددة للصفوف الجديدة — حط الهالة على الخلية اللي محتواها القيمة دي */
+  if(chgData && chgData.fieldValues && chgData.fieldValues.length){
+    const cells = row.querySelectorAll('td');
+    for(const cell of cells){
+      const num = parseFloat((cell.textContent || '').replace(/,/g, '').replace(/%/g, ''));
+      if(!isNaN(num) && chgData.fieldValues.some(v => Math.abs(num - v) < 0.01)){
+        markCell(cell);
+        return;
+      }
+    }
+  }
+  markCell(row);
 }
 function highlightRows(chgData){
   if(!chgData) return;
@@ -240,7 +256,7 @@ function highlightRows(chgData){
           for(const cell of cells){
             const txt = (cell.textContent || '').trim();
             if(txt === p || txt.includes(p) || p.includes(txt)){
-              markRow(row);
+              markRow(row, chgData);
               highlighted++;
               break;
             }
@@ -260,7 +276,7 @@ function highlightRows(chgData){
           const cells = row.querySelectorAll('td');
           for(const cell of cells){
             if((cell.textContent || '').includes(p)){
-              markRow(row);
+              markRow(row, chgData);
               highlighted++;
               break;
             }
@@ -275,7 +291,7 @@ function highlightRows(chgData){
     if(!highlighted){
       const n = Math.max(1, chgData.added > 0 ? chgData.added : 3);
       for(let i = 0; i < Math.min(n, rows.length); i++){
-        markRow(rows[i]);
+        markRow(rows[i], chgData);
         highlighted++;
       }
     }
@@ -333,13 +349,22 @@ function resetApp(){
       50% { background: rgba(242,103,139,0.5) !important; box-shadow: 0 0 25px rgba(242,103,139,0.6), inset 0 0 0 2px #f2678b !important; }
     }
     .highlight-new { animation: alarmBlink 1.2s ease-in-out 3 !important; border-radius: 4px; position: relative; }
-    .highlight-settled {
+    /* هالة على الخلية الرقمية (الرقم اللي زاد) */
+    td.highlight-new { border-radius: 6px; display: table-cell; }
+    td.highlight-settled {
+      box-shadow: 0 0 0 2px rgba(45,212,191,0.55), 0 0 12px rgba(45,212,191,0.45) !important;
+      background: rgba(45,212,191,0.14) !important;
+      border-radius: 6px !important;
+      font-weight: 800 !important;
+    }
+    /* الصف كامل (حالة احتياطية) */
+    tr.highlight-settled {
       box-shadow: inset 3px 0 0 0 #2dd4bf !important;
       background: rgba(45,212,191,0.08) !important;
       position: relative;
     }
-    .highlight-settled td:first-child{ position: relative; }
-    .highlight-settled td:first-child::before {
+    tr.highlight-settled td:first-child{ position: relative; }
+    tr.highlight-settled td:first-child::before {
       content: 'جديد';
       position: absolute; top: 2px; right: 2px;
       background: #2dd4bf; color: #04211d;
