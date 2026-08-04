@@ -18,7 +18,5 @@
   ],
   "screenshots": [],
   "prefer_related_applications": false,
-  "related_applications": [],
-  "permissions": ["notifications", "background-sync", "periodic-background-sync"],
-  "description": "لوحة الإنتاج والهالك واختبارات المنتج النهائي واختبارات المواد الخام — مصنع المنيف للأنابيب"
+  "related_applications": []
 }
