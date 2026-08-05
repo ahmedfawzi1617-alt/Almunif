@@ -108,7 +108,7 @@ function checkChanges(key, data, title, icon, pageUrl){
   /* بيانات التغيير */
   const diff = data.length - parseInt(prev.split('|')[0]) || 0;
   const lastRow = data[data.length - 1];
-  const cfg = VALUE_FIELD_MAP['sw-' + key] || { field:null, unit:'', noun:'سجل' };
+  const cfg = VALUE_FIELD_MAP[key] || { field:null, unit:'', noun:'سجل' };
 
   let detail = 'تم تعديل البيانات';
   if(diff > 0){
@@ -159,42 +159,18 @@ function checkChanges(key, data, title, icon, pageUrl){
     added: diff,
     lastRow: lastRowStr,
     newIds: newIds.slice(-5),
-    field: cfg.field || null,
-    fieldValues: diff > 0 ? data.slice(-diff).map(r => parseFloat(r[cfg.field])).filter(v => v !== null && !isNaN(v)) : [],
     time: Date.now()
   };
   _lastChg = chgData;
   setTimeout(() => highlightRows(chgData), 800);
 
-  /* لو الـ SW عمل إشعار للتغيير ده قبل كده، الصفحة ما تعملش إشعار مكرر */
-  swSeenCount(key).then(swCount => {
-    if(swCount === null || swCount < data.length){
-      sendToSW('show-notif', {
-        title: title || 'المنيف للأنابيب',
-        body: detail, icon: icon || 'icon-192.png',
-        tag: 'page-' + key + '-' + Date.now(),
-        url: pageUrl || ''
-      });
-      showNotifBanner('🔔 ' + detail, 'info');
-    }
+  sendToSW('show-notif', {
+    title: title || 'المنيف للأنابيب',
+    body: detail, icon: icon || 'icon-192.png',
+    tag: 'page-' + key + '-' + Date.now(),
+    url: pageUrl || ''
   });
-}
-
-/* عدد الصفوف اللي الـ SW شافها آخر مرة — من الكاش بتاعه */
-function swSeenCount(key){
-  if(!('caches' in window)) return Promise.resolve(null);
-  return caches.keys().then(names => {
-    for(const n of names){
-      if(n.indexOf('mmp-cache-') === 0){
-        return caches.open(n).then(c => c.match('fp-sw-' + key).then(r => r ? r.text() : null));
-      }
-    }
-    return null;
-  }).then(txt => {
-    if(!txt) return null;
-    const p = parseInt(txt.split('|')[0]);
-    return isNaN(p) ? null : p;
-  }).catch(() => null);
+  showNotifBanner('🔔 ' + detail, 'info');
 }
 
 /* ========== بصمة البيانات ========== */
@@ -204,37 +180,10 @@ function getDataFingerprint(data){
 }
 
 /* ========== إظهار الصفوف الجديدة (تظليل إنذار) ========== */
-function markCell(el){
-  el.classList.add('highlight-new', 'highlight-settled');
-  clearTimeout(el._settledTimer);
-  el._settledTimer = setTimeout(() => el.classList.remove('highlight-settled'), 20000);
-}
-function markRow(row, chgData){
-  const cells = [...row.querySelectorAll('td')];
-
-  /* 1. دور على الخلية اللي محتواها القيمة الرقمية المتعدلة بالظبط */
-  if(chgData && chgData.fieldValues && chgData.fieldValues.length){
-    for(const cell of cells){
-      const num = parseFloat((cell.textContent || '').replace(/,/g, '').replace(/%/g, ''));
-      if(!isNaN(num) && chgData.fieldValues.some(v => Math.abs(num - v) < 0.01)){
-        markCell(cell);
-        return;
-      }
-    }
-  }
-
-  /* 2. لو مفيش تطابق — اختار أكبر رقم في الصف (الكمية/الوزن غالبًا) */
-  let best = null, bestVal = -1;
-  for(const cell of cells){
-    const txt = (cell.textContent || '').trim();
-    if(!/^[\d.,%]+$/.test(txt)) continue;
-    const num = parseFloat(txt.replace(/,/g, '').replace(/%/g, ''));
-    if(!isNaN(num) && num > bestVal){ best = cell; bestVal = num; }
-  }
-  if(best){ markCell(best); return; }
-
-  /* 3. آخر حل — الصف كله */
-  markCell(row);
+function markRow(row){
+  row.classList.add('highlight-new', 'highlight-settled');
+  clearTimeout(row._settledTimer);
+  row._settledTimer = setTimeout(() => row.classList.remove('highlight-settled'), 20000);
 }
 function highlightRows(chgData){
   if(!chgData) return;
@@ -269,7 +218,7 @@ function highlightRows(chgData){
           for(const cell of cells){
             const txt = (cell.textContent || '').trim();
             if(txt === p || txt.includes(p) || p.includes(txt)){
-              markRow(row, chgData);
+              markRow(row);
               highlighted++;
               break;
             }
@@ -289,7 +238,7 @@ function highlightRows(chgData){
           const cells = row.querySelectorAll('td');
           for(const cell of cells){
             if((cell.textContent || '').includes(p)){
-              markRow(row, chgData);
+              markRow(row);
               highlighted++;
               break;
             }
@@ -304,14 +253,13 @@ function highlightRows(chgData){
     if(!highlighted){
       const n = Math.max(1, chgData.added > 0 ? chgData.added : 3);
       for(let i = 0; i < Math.min(n, rows.length); i++){
-        markRow(rows[i], chgData);
+        markRow(rows[i]);
         highlighted++;
       }
     }
 
-    if(highlighted){
-      showNotifBanner('🚨 تم إظهار ' + highlighted + ' صف', 'info');
-    }
+    table.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if(highlighted) showNotifBanner('🚨 تم إظهار ' + highlighted + ' صف', 'info');
   };
 
   doHL();
@@ -362,47 +310,18 @@ function resetApp(){
       50% { background: rgba(242,103,139,0.5) !important; box-shadow: 0 0 25px rgba(242,103,139,0.6), inset 0 0 0 2px #f2678b !important; }
     }
     .highlight-new { animation: alarmBlink 1.2s ease-in-out 3 !important; border-radius: 4px; position: relative; }
-    /* هالة على الخلية الرقمية (الرقم اللي زاد) */
-    td.highlight-new { border-radius: 6px; display: table-cell; }
-    td.highlight-settled {
-      box-shadow: 0 0 0 2px rgba(45,212,191,0.55), 0 0 12px rgba(45,212,191,0.45) !important;
-      background: rgba(45,212,191,0.14) !important;
-      border-radius: 6px !important;
-      font-weight: 800 !important;
-    }
-    /* دائرة حمراء على الخلية الرقمية المتعدلة */
-    td.highlight-settled { position: relative !important; }
-    td.highlight-settled::after {
-      content: '●';
-      position: absolute; top: 2px; left: 2px;
-      color: #f2678b; font-size: 11px; line-height: 1;
-      text-shadow: 0 0 6px rgba(242,103,139,0.9);
-      animation: redDot 1s ease-in-out infinite;
-    }
-    @keyframes redDot {
-      0%, 100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.35); opacity: .7; }
-    }
-    /* الصف كامل (حالة احتياطية) */
-    tr.highlight-settled {
+    .highlight-settled {
       box-shadow: inset 3px 0 0 0 #2dd4bf !important;
       background: rgba(45,212,191,0.08) !important;
       position: relative;
     }
-    tr.highlight-settled td:first-child{ position: relative; }
-    tr.highlight-settled td:first-child::before {
+    .highlight-settled td:first-child{ position: relative; }
+    .highlight-settled td:first-child::before {
       content: 'جديد';
       position: absolute; top: 2px; right: 2px;
       background: #2dd4bf; color: #04211d;
       font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 8px;
       line-height: 1.4; z-index: 2;
-    }
-    tr.highlight-settled td:first-child::after {
-      content: '●';
-      position: absolute; top: 2px; left: 2px;
-      color: #f2678b; font-size: 11px; line-height: 1;
-      text-shadow: 0 0 6px rgba(242,103,139,0.9);
-      animation: redDot 1s ease-in-out infinite;
     }
     #mmpNotifBtnInner:hover { transform:scale(1.1); }
     #mmpNotifBtnInner:active { transform:scale(0.95); }

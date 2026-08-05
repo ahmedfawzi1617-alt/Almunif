@@ -7,8 +7,6 @@ const CORE_URLS = [
   'scrap_dashboard.html',
   'LAB.html',
   'RAW.html',
-  'Orders.html',
-  'notif.js',
   'manifest.json',
   'icon-192.png',
   'icon-512.png'
@@ -108,13 +106,7 @@ async function checkCsvChange(entry){
     const prevFp = prevRes ? await prevRes.text() : null;
     const fp = newRows + '|' + text.slice(0, 4000);
 
-    /* لو الصفحة المفتوحة شافت البيانات دي قبل كده، منع الإشعار المكرر من الـ SW */
-    const pageReq = new Request('page-fp-' + entry.key);
-    const pageRes = await cache.match(pageReq);
-    const pageFp = pageRes ? await pageRes.text() : null;
-    const pageSawIt = !!(pageFp && (parseInt(pageFp.split('|')[0]) || 0) >= newRows);
-
-    if(prevFp && prevFp !== fp && !pageSawIt){
+    if(prevFp && prevFp !== fp){
       const prevRows = parseInt(prevFp.split('|')[0]) || 0;
       const added = newRows - prevRows;
       const cfg = VALUE_FIELD_MAP[entry.key] || { fields:null, unit:'', noun:'سجل' };
@@ -160,7 +152,7 @@ async function checkCsvChange(entry){
       ].filter(Boolean).join(' | ');
 
       self.registration.showNotification('المنيف للأنابيب', {
-        body: detail.replace(/\n/g, ' • '),
+        body: detail,
         icon: 'icon-192.png',
         tag: 'chg-' + entry.key + '-' + ts,
         data: {
@@ -214,7 +206,8 @@ self.addEventListener('message', e => {
   if(data.type === 'keepalive'){ scheduleBgCheck(); return; }
   if(data.type === 'check-now'){ checkAllChanges(); return; }
   if(data.type === 'store-fp' && data.key && data.fp){
-    caches.open(CACHE).then(c => c.put(new Request('page-fp-' + data.key), new Response(data.fp)));
+    caches.open(CACHE).then(c => c.put(new Request('fp-' + data.key), new Response(data.fp)));
+    checkAllChanges();
     return;
   }
   if(data.type === 'show-notif' && data.title && data.body){
@@ -243,16 +236,16 @@ self.addEventListener('periodicsync', e => {
 /* ---------- Fetch ---------- */
 self.addEventListener('fetch', e => {
   const url = e.request.url;
-  if (url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com')) {
+  if (url.includes('google.com') || url.includes('googleapis.com') || url.includes('gstatic.com')) {
+    e.respondWith(fetch(e.request).catch(() => new Response('', { status: 503 })));
+    return;
+  }
+  if (url.includes('fonts.googleapis.com')) {
     e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {
       const copy = res.clone();
       if (res.ok) caches.open(CACHE).then(c => c.put(e.request, copy));
       return res;
     })));
-    return;
-  }
-  if (url.includes('google.com') || url.includes('googleapis.com') || url.includes('gstatic.com')) {
-    e.respondWith(fetch(e.request).catch(() => new Response('', { status: 503 })));
     return;
   }
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {
