@@ -556,6 +556,11 @@ function populateFilters(){
 
   const yearScope = scopedFor('yr');
   fillSelect('fYear', [...new Set(yearScope.map(r=>r.date.slice(0,4)))].sort(), v=>v, 'Year');
+  const yearSel = document.getElementById('fYear');
+  if((yearSel.value || 'all') === 'all'){
+    const curY = String(new Date().getFullYear());
+    if([...yearSel.options].some(o => o.value === curY)) yearSel.value = curY;
+  }
 
   const monthScope = scopedFor('m');
   fillSelect('fMonth', [...new Set(monthScope.map(r=>r.date.slice(0,7)))].sort(), m=>{ const [y,mo]=m.split('-'); return (MONTHS_AR[parseInt(mo)]||mo) + ' ' + y; }, 'Month');
@@ -825,6 +830,7 @@ function exportReport(){
     </div>`;
   }).join('');
 
+  const BASE = location.href.substring(0, location.href.lastIndexOf('/')+1);
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -838,7 +844,8 @@ function exportReport(){
   .ltr-cell{direction:ltr; unicode-bidi:plaintext; text-align:right;}
   .print-bar{position:sticky; top:0; background:#fff; padding:10px 0 16px; margin-bottom:10px; border-bottom:2px solid #eee; display:flex; justify-content:flex-end; gap:10px;}
   .print-bar button{font-family:inherit; font-size:14px; font-weight:700; padding:9px 18px; border-radius:8px; border:none; cursor:pointer; background:#2C3E6B; color:#fff;}
-  header{text-align:center; margin-bottom:18px;}
+  header{position:relative; text-align:center; margin-bottom:18px;}
+  header .logo{position:absolute; top:0.5cm; right:0; height:50px; width:auto; object-fit:contain;}
   header h1{font-size:22px; margin:0 0 2px;}
   header .dept{font-size:13px; color:#555; font-style:italic; margin-bottom:10px;}
   header hr{border:none; border-top:3px solid #2C3E6B; margin:10px 0 16px;}
@@ -864,8 +871,10 @@ function exportReport(){
   footer{text-align:center; font-size:11px; color:#888; margin-top:26px; font-style:italic;}
   @media print{
     .print-bar{display:none;}
-    body{padding:14px 20px;}
+    body{padding:14px 20px; padding-top:150px;}
     a[href]:after{content:'';}
+    header{position:fixed; top:0; left:0; right:0; z-index:10; background:#fff; padding:6px 10px 4px; text-align:center; margin:0;}
+    header .logo{position:absolute; top:0.5cm; right:8px; height:50px; width:auto;}
   }
 </style>
 </head>
@@ -874,6 +883,7 @@ function exportReport(){
     <button onclick="window.print()">🖨️ اطبع / احفظ PDF</button>
   </div>
   <header>
+    <img class="logo" src="${BASE}new logo PNG.png" alt="logo">
     <h1>شركة المنيف للأنابيب</h1>
     <div class="dept">إدارة الجودة — معمل اختبارات المواسير</div>
     <hr>

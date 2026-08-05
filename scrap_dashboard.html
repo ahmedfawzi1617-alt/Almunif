@@ -587,15 +587,32 @@ function parseDate(str){
   m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if(m){
     let [, a, b, yr] = m;
-    let mo = parseInt(a), da = parseInt(b);
-    // لو أي رقم أكبر من 12 يبقى هو أكيد اليوم، مش الشهر (بيحل مشكلة صيغ التاريخ المختلفة بين الشيتات)
-    if(mo > 12 && da <= 12){ const t=mo; mo=da; da=t; }
+    let da = parseInt(a), mo = parseInt(b);
+    // صيغة DD/MM/YYYY افتراضية (يوم/شهر/سنة)
+    // لو اليوم أكبر من 31 يبقى هو أكيد الشهر، مش اليوم (صيغة أمريكية MM/DD)
+    if(da > 31 && mo <= 12){ const t=da; da=mo; mo=t; }
     if(yr.length===2) yr = (parseInt(yr)>50 ? '19' : '20') + yr;
     return `${yr}-${pad2(mo)}-${pad2(da)}`;
   }
   return str;
 }
 function pad2(n){ return String(n).padStart(2,'0'); }
+
+/* ---------- توليد فترة تلقائية من البيانات المفّلترة (1-Jan:31-Jul-2026) ---------- */
+function autoPeriodLabel(data){
+  const MONTHS_EN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dates = (data||[]).map(r=>r.date).filter(Boolean).sort();
+  if(!dates.length) return 'الفترة الحالية';
+  const first = dates[0], last = dates[dates.length-1];
+  const fmt = d => {
+    const p = d.split('-');
+    const day = parseInt(p[2]);
+    const month = MONTHS_EN[parseInt(p[1])-1];
+    const year = p[0];
+    return day + '-' + month + '-' + year;
+  };
+  return first === last ? fmt(first) : fmt(first) + ' : ' + fmt(last);
+}
 
 /* ---------- فلاتر ---------- */
 /* ---------- فلاتر ذكية (Smart Cascading Filters) ----------
@@ -713,7 +730,7 @@ function renderPareto(data){
     options: baseOptions({
       layout:{padding:{top:24}},
       scales:{
-        x:{ticks:{color:'#aebdd4', font:{family:'Cairo', size:11}}, grid:{display:false}},
+        x:{ticks:{color:'#aebdd4', font:{family:'Cairo', size:11}, maxRotation:90, minRotation:90, autoSkip:false}, grid:{display:false}},
         y:{position:'left', ticks:{color:'#aebdd4'}, grid:{color:'rgba(255,255,255,0.05)'}},
         y1:{position:'right', min:0, max:100, ticks:{color:'#6f83a3', callback:v=>v+'%'}, grid:{display:false}}
       }
@@ -785,7 +802,7 @@ function renderTrend(data){
       plugins:{legend:{display:false}},
       layout:{padding:{top:22}},
       scales:{
-        x:{ticks:{color:'#aebdd4', font:{family:'Cairo'}}, grid:{display:false}},
+        x:{ticks:{color:'#aebdd4', font:{family:'Cairo'}, maxRotation:90, minRotation:90, autoSkip:false}, grid:{display:false}},
         y:{ticks:{color:'#aebdd4'}, grid:{color:'rgba(255,255,255,0.05)'}}
       }
     })
@@ -806,7 +823,7 @@ function renderShift(data){
       plugins:{legend:{display:false}},
       layout:{padding:{top:22}},
       scales:{
-        x:{ticks:{color:'#aebdd4', font:{family:'Cairo'}}, grid:{display:false}},
+        x:{ticks:{color:'#aebdd4', font:{family:'Cairo'}, maxRotation:90, minRotation:90, autoSkip:false}, grid:{display:false}},
         y:{ticks:{color:'#aebdd4'}, grid:{color:'rgba(255,255,255,0.05)'}}
       }
     })
@@ -953,7 +970,8 @@ function generateScrapReport(){
   const data = getFiltered();
   if(!data.length){ alert('مفيش بيانات هالك مطابقة للفلتر الحالي.'); return; }
 
-  const periodLabel = document.getElementById('reportPeriodLabel').value.trim() || 'الفترة الحالية';
+  const periodLabel = document.getElementById('reportPeriodLabel').value.trim() ||
+    autoPeriodLabel(data);
   const peVal = document.getElementById('reportProdPE').value;
   const pvcVal = document.getElementById('reportProdPVC').value;
   const prodPE = (peVal && peVal!=='—') ? parseFloat(peVal) : 0;
@@ -1004,6 +1022,7 @@ function generateScrapReport(){
   const scrapPctPVC = (prodPVC || totalPVC) ? ((totalPVC/1000)/(prodPVC + totalPVC/1000)*100).toFixed(2)+'%' : '—';
   const scrapPctTotal = (prodTotal || grandTotal) ? ((grandTotal/1000)/(prodTotal + grandTotal/1000)*100).toFixed(2)+'%' : '—';
 
+  const BASE = location.href.substring(0, location.href.lastIndexOf('/')+1);
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -1018,20 +1037,21 @@ function generateScrapReport(){
   body{font-family:'Cairo',sans-serif; color:#1a1a2e; margin:0; padding:26px 30px; background:#fff;}
   .print-bar{position:sticky; top:0; background:#fff; padding:10px 0 16px; margin-bottom:14px; border-bottom:2px solid #ddd; display:flex; justify-content:flex-end; gap:10px;}
   .print-bar button{font-family:inherit; font-size:14px; font-weight:700; padding:9px 18px; border-radius:8px; border:none; cursor:pointer; background:#1a3a5c; color:#fff;}
-  header{text-align:center; margin-bottom:12px;}
+  header{position:relative; text-align:center; margin-bottom:12px;}
+  header .logo{position:absolute; top:0.5cm; right:0; height:50px; width:auto; object-fit:contain;}
   header .period{font-size:14px; font-weight:800; color:#1a3a5c; margin-bottom:2px; border-bottom:2px solid #1a3a5c; display:inline-block; padding-bottom:2px;}
   header .title{font-size:15px; font-weight:700; color:#1a3a5c; margin-top:4px;}
-  table{width:100%; border-collapse:collapse; font-size:11.5px; border:3px double #555;}
-  th, td{border:1px solid #999; padding:4px 6px; text-align:center; color:#111;}
+  table{width:100%; border-collapse:collapse; font-size:12px; border:3px double #555;}
+  th, td{border:1px solid #999; padding:5px 7px; text-align:center; color:#111;}
   td.pe-col, th.pe-col{border-left:3px double #2e8b57;}
   td.pvc-col, th.pvc-col{border-left:3px double #7c3aed;}
   td.total-col, th.total-col{border-left:3px double #dc2626;}
-  .defect-cell{text-align:right; font-weight:700;}
-  thead tr.group-row th{background:#1a3a5c; color:#fff; font-size:12px; padding:6px 7px; border-bottom:2px double #fff;}
+  .defect-cell{text-align:center; font-weight:700;}
+  thead tr.group-row th{background:#1a3a5c; color:#fff; font-size:13px; padding:6px 8px; border-bottom:2px double #fff;}
   thead tr.group-row th.pe-head{background:#2e8b57;}
   thead tr.group-row th.pvc-head{background:#7c3aed;}
   thead tr.group-row th.total-head{background:#dc2626;}
-  thead tr.sub-row th{font-size:10.5px; font-weight:800; color:#111; background:#f0f2f5; border-bottom:2px solid #bbb;}
+  thead tr.sub-row th{font-size:12px; font-weight:800; color:#111; background:#f0f2f5; border-bottom:2px solid #bbb;}
   thead tr.sub-row th.pe-sub{border-bottom-color:#2e8b57;}
   thead tr.sub-row th.pvc-sub{border-bottom-color:#7c3aed;}
   thead tr.sub-row th.total-sub{border-bottom-color:#dc2626;}
@@ -1040,13 +1060,19 @@ function generateScrapReport(){
   tbody tr:nth-child(even){background:#f8f9fb;}
   tbody tr:hover{background:#eef1f6;}
   tfoot td{font-weight:800;}
-  tfoot tr.total-row td{background:#1a3a5c; color:#fff; font-size:12.5px; border-top:2px double #fff;}
-  tfoot tr.prod-row td{background:#334e77; color:#fff; border-top:1px solid #fff;}
-  tfoot tr.pct-row td{font-weight:900; border-top:3px double #555; background:#f0f2f5; color:#111;}
+  tfoot tr.total-row td{background:#1a3a5c; color:#fff; font-size:13px; border-top:2px double #fff;}
+  tfoot tr.prod-row td{background:#334e77; color:#fff; font-size:12px; border-top:1px solid #fff;}
+  tfoot tr.pct-row td{font-weight:900; font-size:13px; border-top:3px double #555; background:#f0f2f5; color:#111;}
   footer{text-align:center; font-size:11px; color:#888; margin-top:20px;}
+  @page{size:A4 landscape; margin:10mm;}
   @media print{
     .print-bar{display:none;}
-    body{padding:10px 14px; color:#000;}
+    body{padding:10px 14px; padding-top:110px; color:#000;}
+    table, .chart-page, canvas{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
+    header{position:fixed; top:0; left:0; right:0; z-index:10; background:#fff; padding:8px 10px 6px; text-align:center; border-bottom:2px solid #1a3a5c; margin:0;}
+    header .logo{position:absolute; top:0.5cm; right:8px; height:50px; width:auto;}
+    header .period{font-size:14px; font-weight:800; color:#1a3a5c; border-bottom:2px solid #1a3a5c;}
+    header .title{font-size:14px; font-weight:700; color:#1a3a5c;}
     table{border:3px double #444;}
     th, td{border:1px solid #999; color:#000; background:#fff !important;}
     td.pe-col, th.pe-col, td.pvc-col, th.pvc-col, td.total-col, th.total-col{border-left:3px double #555;}
@@ -1060,19 +1086,23 @@ function generateScrapReport(){
     tfoot tr.total-row td{background:#fff !important; color:#000 !important; border-top:2px double #000 !important; font-weight:900;}
     tfoot tr.prod-row td{background:#fff !important; color:#000 !important; border-top:1px solid #999;}
     tfoot tr.pct-row td{background:#f9f9f9 !important; color:#000 !important; border-top:2px double #000;}
-    header .period, header .title{color:#000;}
-    .chart-page{border:2px solid #1a3a5c; border-radius:8px; padding:20px; margin:20px 0; page-break-inside:avoid;}
-    @media print{.chart-page{page-break-after:always;}}
-    @media print{.chart-page:last-child{page-break-after:auto;}}
+    .report-section{page-break-after:always;}
+    .chart-page{page-break-inside:avoid; height:calc(100vh - 30px); display:flex; flex-direction:column;}
+    .chart-page ~ .chart-page{page-break-before:always;}
+    .chart-page:last-child{page-break-after:auto;}
+    .chart-page > div{width:100% !important; max-width:100% !important; flex:1 1 auto; min-height:280px; padding:12px;}
+    .chart-page canvas{width:100% !important; max-width:100% !important; height:100% !important;}
   }
 </style>
 </head>
 <body>
   <div class="print-bar"><button onclick="window.print()">🖨️ اطبع / احفظ PDF</button></div>
- <header>
-    <div class="period">${periodLabel}</div>
+  <header>
+    <img class="logo" src="${BASE}new logo PNG.png" alt="logo">
+    <div class="period" dir="ltr">${periodLabel}</div>
     <div class="title">Scrap And Defect details (PE- PVC)</div>
   </header>
+  <div class="report-section">
   <table>
     <thead>
       <tr class="group-row">
@@ -1110,15 +1140,16 @@ function generateScrapReport(){
       </tr>
     </tfoot>
   </table>
-
-  <div class="chart-page">
-    <h3 style="text-align:center; font-size:14px; color:#1a3a5c; margin-bottom:10px;">عدد مرات تكرار العيوب — PE vs PVC</h3>
-    <div style="max-width:700px; margin:0 auto;"><canvas id="defectCountChart" height="300"></canvas></div>
   </div>
 
   <div class="chart-page">
-    <h3 style="text-align:center; font-size:14px; color:#1a3a5c; margin-bottom:10px;">وزن العيوب — PE vs PVC (كجم)</h3>
-    <div style="max-width:700px; margin:0 auto;"><canvas id="defectWeightChart" height="300"></canvas></div>
+    <h3 style="text-align:center; font-size:14px; color:#1a3a5c; margin-bottom:10px;">عدد تكرار العيوب</h3>
+    <div style="width:100%; height:calc(100vh - 80px); min-height:420px; background:#f2f2f2; padding:14px; border-radius:6px;"><canvas id="defectCountChart"></canvas></div>
+  </div>
+
+  <div class="chart-page">
+    <h3 style="text-align:center; font-size:14px; color:#1a3a5c; margin-bottom:10px;">كمية اسكراب كل عيب</h3>
+    <div style="width:100%; height:calc(100vh - 80px); min-height:420px; background:#f2f2f2; padding:14px; border-radius:6px;"><canvas id="defectWeightChart"></canvas></div>
   </div>
 
   <footer>تم إنشاء هذا التقرير تلقائيًا من لوحة الهالك — المنيف للأنابيب</footer>
@@ -1130,22 +1161,22 @@ new Chart(document.getElementById('defectCountChart'), {
   data:{
     labels,
     datasets:[
-      {label:'PE', data:${JSON.stringify(rows.map(r=>r.peCount))}, backgroundColor:'#2e8b57', borderRadius:6, maxBarThickness:28,
-        datalabels:{color:'#0a1628', font:{family:'Cairo', weight:'800', size:10.5}, anchor:'end', align:'top', offset:4, clamp:true, clip:false, display:'auto', formatter:v=>v||''}},
-      {label:'PVC', data:${JSON.stringify(rows.map(r=>r.pvcCount))}, backgroundColor:'#7c3aed', borderRadius:6, maxBarThickness:28,
-        datalabels:{color:'#0a1628', font:{family:'Cairo', weight:'800', size:10.5}, anchor:'end', align:'top', offset:4, clamp:true, clip:false, display:'auto', formatter:v=>v||''}}
+      {label:'PE', data:${JSON.stringify(rows.map(r=>r.peCount))}, backgroundColor:'#1e6fd9', borderRadius:6, maxBarThickness:60,
+        datalabels:{color:'#0a1628', font:{family:'Cairo', weight:'800', size:12}, anchor:'end', align:'top', offset:18, rotation:270, clamp:true, clip:false, display:true, formatter:v=>v||''}},
+      {label:'PVC', data:${JSON.stringify(rows.map(r=>r.pvcCount))}, backgroundColor:'#f2a93b', borderRadius:6, maxBarThickness:60,
+        datalabels:{color:'#0a1628', font:{family:'Cairo', weight:'800', size:12}, anchor:'end', align:'top', offset:18, rotation:270, clamp:true, clip:false, display:true, formatter:v=>v||''}}
     ]
   },
   options:{
-    responsive:true, maintainAspectRatio:true,
+    responsive:true, maintainAspectRatio:false,
     plugins:{
       legend:{position:'top', labels:{font:{family:'Cairo',size:12}, padding:16, usePointStyle:true}},
       tooltip:{titleFont:{family:'Cairo'}, bodyFont:{family:'Cairo'}}
     },
-    layout:{padding:{top:28}},
+    layout:{padding:{top:50, left:10, right:10}},
     scales:{
-      x:{ticks:{font:{family:'Cairo',size:10}}, grid:{display:false}},
-      y:{beginAtZero:true, ticks:{font:{family:'Cairo',size:10}}, grid:{color:'#ddd'}}
+      x:{ticks:{color:'#1a3a5c', font:{family:'Cairo',size:12, weight:'700'}, autoSkip:false, maxRotation:60, minRotation:60}, grid:{color:'rgba(0,0,0,0.08)'}},
+      y:{display:false}
     }
   }
 });
@@ -1154,22 +1185,22 @@ new Chart(document.getElementById('defectWeightChart'), {
   data:{
     labels,
     datasets:[
-      {label:'PE', data:${JSON.stringify(rows.map(r=>r.peWeight))}, backgroundColor:'#2e8b57', borderRadius:6, maxBarThickness:28,
-        datalabels:{color:'#0a1628', font:{family:'Cairo', weight:'800', size:10.5}, anchor:'end', align:'top', offset:4, clamp:true, clip:false, display:'auto', formatter:v=>Math.round(v)+' kg'}},
-      {label:'PVC', data:${JSON.stringify(rows.map(r=>r.pvcWeight))}, backgroundColor:'#7c3aed', borderRadius:6, maxBarThickness:28,
-        datalabels:{color:'#0a1628', font:{family:'Cairo', weight:'800', size:10.5}, anchor:'end', align:'top', offset:4, clamp:true, clip:false, display:'auto', formatter:v=>Math.round(v)+' kg'}}
+      {label:'PE', data:${JSON.stringify(rows.map(r=>r.peWeight))}, backgroundColor:'#1e6fd9', borderRadius:6, maxBarThickness:60,
+        datalabels:{color:'#0a1628', font:{family:'Cairo', weight:'800', size:12}, anchor:'end', align:'top', offset:55, rotation:270, clamp:true, clip:false, display:true, formatter:v=>Math.round(v)}},
+      {label:'PVC', data:${JSON.stringify(rows.map(r=>r.pvcWeight))}, backgroundColor:'#f2a93b', borderRadius:6, maxBarThickness:60,
+        datalabels:{color:'#0a1628', font:{family:'Cairo', weight:'800', size:12}, anchor:'end', align:'top', offset:55, rotation:270, clamp:true, clip:false, display:true, formatter:v=>Math.round(v)}}
     ]
   },
   options:{
-    responsive:true, maintainAspectRatio:true,
+    responsive:true, maintainAspectRatio:false,
     plugins:{
       legend:{position:'top', labels:{font:{family:'Cairo',size:12}, padding:16, usePointStyle:true}},
       tooltip:{titleFont:{family:'Cairo'}, bodyFont:{family:'Cairo'}}
     },
-    layout:{padding:{top:28}},
+    layout:{padding:{top:100, left:10, right:10}},
     scales:{
-      x:{ticks:{font:{family:'Cairo',size:10}}, grid:{display:false}},
-      y:{beginAtZero:true, ticks:{font:{family:'Cairo',size:10}}, grid:{color:'#ddd'}}
+      x:{ticks:{color:'#1a3a5c', font:{family:'Cairo',size:12, weight:'700'}, autoSkip:false, maxRotation:60, minRotation:60}, grid:{color:'rgba(0,0,0,0.08)'}},
+      y:{display:false}
     }
   }
 });
