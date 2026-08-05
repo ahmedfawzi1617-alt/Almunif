@@ -193,6 +193,7 @@
   #loginGate{
     position:fixed; inset:0; z-index:999;
     background:
+      url('23.jpeg') center/cover no-repeat,
       radial-gradient(1100px 600px at 12% -10%, rgba(45,212,191,0.08), transparent 60%),
       radial-gradient(900px 500px at 100% 0%, rgba(242,169,59,0.07), transparent 55%),
       linear-gradient(180deg, var(--bg-0), var(--bg-1) 40%, var(--bg-1));
@@ -916,6 +917,7 @@ getFiltered().map((d,i)=>[d,i]).sort((a,b)=>b[0].date.localeCompare(a[0].date) |
       <td>${esc(g.order)}</td><td>${g.pcs}</td><td>${esc(g.length)}</td><td>${Math.round(g.kg).toLocaleString('en-US')}</td>
     </tr>`).join('');
 
+  const BASE = location.href.substring(0, location.href.lastIndexOf('/')+1);
   const html = `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -928,7 +930,8 @@ getFiltered().map((d,i)=>[d,i]).sort((a,b)=>b[0].date.localeCompare(a[0].date) |
   body{font-family:'Cairo',sans-serif; color:#111; margin:0; padding:28px 34px; background:#fff;}
   .print-bar{position:sticky; top:0; background:#fff; padding:10px 0 16px; margin-bottom:10px; border-bottom:2px solid #eee; display:flex; justify-content:flex-end; gap:10px;}
   .print-bar button{font-family:inherit; font-size:14px; font-weight:700; padding:9px 18px; border-radius:8px; border:none; cursor:pointer; background:#2C3E6B; color:#fff;}
-  header{text-align:center; margin-bottom:18px;}
+  header{position:relative; text-align:center; margin-bottom:18px;}
+  header .logo{position:absolute; top:0.5cm; right:0; height:50px; width:auto; object-fit:contain;}
   header h1{font-size:22px; margin:0 0 2px;}
   header .dept{font-size:13px; color:#555; font-style:italic; margin-bottom:10px;}
   header hr{border:none; border-top:3px solid #2C3E6B; margin:10px 0 16px;}
@@ -950,8 +953,10 @@ getFiltered().map((d,i)=>[d,i]).sort((a,b)=>b[0].date.localeCompare(a[0].date) |
   footer{text-align:center; font-size:11px; color:#888; margin-top:26px; font-style:italic;}
   @media print{
     .print-bar{display:none;}
-    body{padding:14px 20px;}
+    body{padding:14px 20px; padding-top:150px;}
     a[href]:after{content:'';}
+    header{position:fixed; top:0; left:0; right:0; z-index:10; background:#fff; padding:6px 10px 4px; text-align:center; margin:0;}
+    header .logo{position:absolute; top:0.5cm; right:8px; height:50px; width:auto;}
   }
 </style>
 </head>
@@ -960,6 +965,7 @@ getFiltered().map((d,i)=>[d,i]).sort((a,b)=>b[0].date.localeCompare(a[0].date) |
     <button onclick="window.print()">🖨️ اطبع / احفظ PDF</button>
   </div>
   <header>
+    <img class="logo" src="${BASE}new logo PNG.png" alt="logo">
     <h1>شركة المنيف للأنابيب</h1>
     <div class="dept">إدارة الإنتاج</div>
     <hr>
@@ -1040,11 +1046,12 @@ getFiltered().map((d,i)=>[d,i]).sort((a,b)=>b[0].date.localeCompare(a[0].date) |
 
 function printPageHtml(content){
   const now = new Date();
+  const BASE = location.href.substring(0, location.href.lastIndexOf('/')+1);
   return `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير الإنتاج</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet"><style>
     *{box-sizing:border-box;} body{font-family:'Cairo',sans-serif; color:#111; margin:0; padding:28px 34px; background:#fff;}
     .print-bar{position:sticky;top:0;background:#fff;padding:10px 0 16px;margin-bottom:10px;border-bottom:2px solid #eee;display:flex;justify-content:flex-end;gap:10px;}
     .print-bar button{font-family:inherit;font-size:14px;font-weight:700;padding:9px 18px;border-radius:8px;border:none;cursor:pointer;background:#2C3E6B;color:#fff;}
-    header{text-align:center;margin-bottom:18px;} header h1{font-size:22px;margin:0 0 2px;} header hr{border:none;border-top:3px solid #2C3E6B;margin:10px 0 16px;}
+    header{position:relative;text-align:center;margin-bottom:18px;} header .logo{position:absolute;top:0.5cm;right:0;height:50px;width:auto;object-fit:contain;} header h1{font-size:22px;margin:0 0 2px;} header hr{border:none;border-top:3px solid #2C3E6B;margin:10px 0 16px;}
     header h2{font-size:19px;margin:8px 0 16px;}
     table{width:100%;border-collapse:collapse;margin-bottom:16px;font-size:12.5px;}
     .info-header-table th,.info-header-table td{border:1px solid #ccc;padding:7px 10px;text-align:right;}
@@ -1053,10 +1060,10 @@ function printPageHtml(content){
     table.summary-table th,table.summary-table td{border:1px solid #bbb;padding:6px 8px;text-align:center;}
     table.summary-table th{background:#D9DEEC;font-weight:700;}
     footer{text-align:center;font-size:11px;color:#888;margin-top:26px;font-style:italic;}
-    @media print{.print-bar{display:none;}body{padding:14px 20px;}}
+    @media print{.print-bar{display:none;}body{padding:14px 20px;padding-top:150px;}header{position:fixed;top:0;left:0;right:0;z-index:10;background:#fff;padding:6px 10px 4px;text-align:center;margin:0;}header .logo{position:absolute;top:0.5cm;right:8px;height:50px;width:auto;}}
   </style></head><body>
   <div class="print-bar"><button onclick="window.print()">🖨️ اطبع / احفظ PDF</button></div>
-  <header><h1>شركة المنيف للأنابيب</h1><hr><h2>تقرير الإنتاج — ${now.toLocaleDateString('ar-EG')}</h2></header>
+  <header><img class="logo" src="${BASE}new logo PNG.png" alt="logo"><h1>شركة المنيف للأنابيب</h1><hr><h2>تقرير الإنتاج — ${now.toLocaleDateString('ar-EG')}</h2></header>
   ${content}
   <footer>تم إنشاء هذا التقرير تلقائيًا من لوحة الإنتاج — المنيف للأنابيب</footer>
   </body></html>`;
