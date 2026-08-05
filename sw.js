@@ -1,12 +1,15 @@
 importScripts('https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js');
 
-const CACHE = 'mmp-cache-v5';
+const CACHE = 'mmp-cache-v7';
 const CORE_URLS = [
+  'index.html',
   'OVERVIEW.html',
   'Production.html',
   'scrap_dashboard.html',
   'LAB.html',
   'RAW.html',
+  'Orders.html',
+  'notif.js',
   'manifest.json',
   'icon-192.png',
   'icon-512.png'
@@ -19,7 +22,8 @@ const CSV_URLS = [
   { url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQiYC7XUuYzsqOQkKtxFH667BvpK0sroldpVvGwJ-V4r0bfbA2-ar-ZlsBPyBLcMBDsi5EKFwWTmxC/pub?gid=845489182&single=true&output=csv', name: 'خام', key: 'sw-raw', page: 'RAW.html' }
 ];
 
-const VAPID_PUBLIC_KEY = 'BFe0Pj5XJd_J_XKStHr4QOBXHqDSqk01A8lGcQqMLBSYkH5sRc_c5r4P7phBO8rBDJFQLQ9FG8DJQqGU82BS0ik';
+const VAPID_PUBLIC_KEY = 'BIGOZIPM9M8RF4lPHj3tfaIFVTAUaBZUL5Fz0kvNfkh5yUaX88KVJ3L6zmXVNXuHViT4dij354qMch3xWcmyhFQ';
+const PUSH_WORKER_URL = 'https://mmp-push-worker.ahmedfawzi1617.workers.dev';
 
 /* خريطة "الرقم المهم" لكل شيت — بأسماء الأعمدة الحقيقية في ملف الإكسل/الشيت */
 const VALUE_FIELD_MAP = {
@@ -69,8 +73,19 @@ function subscribeToPush(){
   }).then(sub => {
     if(!sub) return;
     caches.open(CACHE).then(c => c.put('push-sub', new Response(JSON.stringify(sub.toJSON()))));
+    /* إرسال الاشتراك للسيرفر (الـ Worker) عشان يقدر يبعت push حتى في الخلفية */
+    const subJson = sub.toJSON();
+    fetch(PUSH_WORKER_URL + '/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint: sub.endpoint,
+        keys: subJson.keys,
+        userAgent: navigator.userAgent
+      })
+    }).catch(() => {});
     self.clients.matchAll().then(cls => {
-      cls.forEach(c => c.postMessage({ type: 'push-sub', sub: sub.toJSON() }));
+      cls.forEach(c => c.postMessage({ type: 'push-sub', sub: subJson }));
     });
   }).catch(() => {});
 }
@@ -106,7 +121,13 @@ async function checkCsvChange(entry){
     const prevFp = prevRes ? await prevRes.text() : null;
     const fp = newRows + '|' + text.slice(0, 4000);
 
-    if(prevFp && prevFp !== fp){
+    /* لو الصفحة المفتوحة شافت البيانات دي قبل كده، منع الإشعار المكرر من الـ SW */
+    const pageReq = new Request('page-fp-' + entry.key);
+    const pageRes = await cache.match(pageReq);
+    const pageFp = pageRes ? await pageRes.text() : null;
+    const pageSawIt = !!(pageFp && (parseInt(pageFp.split('|')[0]) || 0) >= newRows);
+
+    if(prevFp && prevFp !== fp && !pageSawIt){
       const prevRows = parseInt(prevFp.split('|')[0]) || 0;
       const added = newRows - prevRows;
       const cfg = VALUE_FIELD_MAP[entry.key] || { fields:null, unit:'', noun:'سجل' };
@@ -152,7 +173,7 @@ async function checkCsvChange(entry){
       ].filter(Boolean).join(' | ');
 
       self.registration.showNotification('المنيف للأنابيب', {
-        body: detail,
+        body: detail.replace(/\n/g, ' • '),
         icon: 'icon-192.png',
         tag: 'chg-' + entry.key + '-' + ts,
         data: {
@@ -206,8 +227,7 @@ self.addEventListener('message', e => {
   if(data.type === 'keepalive'){ scheduleBgCheck(); return; }
   if(data.type === 'check-now'){ checkAllChanges(); return; }
   if(data.type === 'store-fp' && data.key && data.fp){
-    caches.open(CACHE).then(c => c.put(new Request('fp-' + data.key), new Response(data.fp)));
-    checkAllChanges();
+    caches.open(CACHE).then(c => c.put(new Request('page-fp-' + data.key), new Response(data.fp)));
     return;
   }
   if(data.type === 'show-notif' && data.title && data.body){
@@ -236,16 +256,16 @@ self.addEventListener('periodicsync', e => {
 /* ---------- Fetch ---------- */
 self.addEventListener('fetch', e => {
   const url = e.request.url;
-  if (url.includes('google.com') || url.includes('googleapis.com') || url.includes('gstatic.com')) {
-    e.respondWith(fetch(e.request).catch(() => new Response('', { status: 503 })));
-    return;
-  }
-  if (url.includes('fonts.googleapis.com')) {
+  if (url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com')) {
     e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {
       const copy = res.clone();
       if (res.ok) caches.open(CACHE).then(c => c.put(e.request, copy));
       return res;
     })));
+    return;
+  }
+  if (url.includes('google.com') || url.includes('googleapis.com') || url.includes('gstatic.com')) {
+    e.respondWith(fetch(e.request).catch(() => new Response('', { status: 503 })));
     return;
   }
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {

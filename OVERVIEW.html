@@ -274,6 +274,17 @@
   .login-box button:active{transform:scale(.98);}
   .login-error{color:var(--rose); font-size:12.5px; font-weight:700; margin-top:12px; min-height:16px;}
 
+  /* ===== App Splash ===== */
+  #appSplash{
+    position:fixed; inset:0; z-index:1000;
+    background:#070f1c;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px;
+    transition:opacity .7s ease;
+  }
+  #appSplash.hide{ opacity:0; pointer-events:none; }
+  .splash-logo{ width:55%; max-width:420px; height:auto; }
+  .splash-title{ font-family:'Cairo','Tajawal',sans-serif; font-size:28px; font-weight:800; color:#fff; letter-spacing:2px; }
+
   #navFab{
     position:fixed; top:22px; right:22px; z-index:97;
     width:50px; height:50px; border-radius:50%; border:none; cursor:pointer;
@@ -295,6 +306,10 @@
 <script src="notif.js"></script>
 </head>
 <body>
+<div id="appSplash">
+  <img class="splash-logo" src="new logo PNG.png" alt="Al-Munif Pipes">
+  <div class="splash-title">MMP - EGYPT</div>
+</div>
 <div class="wrap">
 
   <div id="loginGate">
@@ -656,5 +671,19 @@ document.addEventListener('keypress', e=>{
     }
   });
 }).catch(()=>{});}</script>
+<script>
+(function(){
+  var s = document.getElementById('appSplash');
+  if(!s) return;
+  var done = false;
+  var kill = function(){
+    if(done) return; done = true;
+    s.classList.add('hide');
+    setTimeout(function(){ if(s.parentNode) s.parentNode.removeChild(s); }, 800);
+  };
+  window.addEventListener('load', function(){ setTimeout(kill, 1800); });
+  setTimeout(kill, 5000);
+})();
+</script>
 </body>
 </html>
