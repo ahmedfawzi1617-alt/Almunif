@@ -1,6 +1,6 @@
 importScripts('https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js');
 
-const CACHE = 'mmp-cache-v7';
+const CACHE = 'mmp-cache-v8';
 const CORE_URLS = [
   'index.html',
   'OVERVIEW.html',

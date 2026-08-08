@@ -1,6 +1,12 @@
 var _swKeepAlive = null;
 var _lastChg = null;
 
+/* منع المتصفح من استرجاع موضع التمرير القديم عند فتح الصفحة من إشعار
+   (كان بيقفز عند آخر مكان، زي "شهر 4" في ملخص الهالك) */
+if('scrollRestoration' in history){
+  try{ history.scrollRestoration = 'manual'; }catch(e){}
+}
+
 /* ========== خريطة "الرقم المهم" لكل شيت — عشان الإشعار يوري القيمة الفعلية مش بس عدد السجلات ========== */
 var VALUE_FIELD_MAP = {
   'sw-prod':  { field:'qty_kg',  unit:'كجم', noun:'عملية إنتاج' },
@@ -211,7 +217,7 @@ function getDataFingerprint(data){
 function markCell(el){
   el.classList.add('highlight-new', 'highlight-settled');
   clearTimeout(el._settledTimer);
-  el._settledTimer = setTimeout(() => el.classList.remove('highlight-settled'), 20000);
+  el._settledTimer = setTimeout(() => el.classList.remove('highlight-settled'), 60000);
 }
 function markRow(row, chgData){
   const cells = [...row.querySelectorAll('td')];
@@ -258,7 +264,18 @@ function highlightRows(chgData){
       table = table.closest ? (table.closest('table') || table) : table;
       const tbody = table.querySelector('tbody') || table;
       const rows = [...tbody.querySelectorAll('tr')].filter(r => !r.querySelector('th'));
-    if(!rows.length){ showNotifBanner('📊 تم التحديث', 'info'); return; }
+    if(!rows.length){
+      /* الجدول لسه مش متعبّى (الصفحة لسه بتحمّل البيانات) — نعيد المحاولة لحد ما يظهر */
+      if(!window._hlEmpty){ window._hlEmpty = 0; }
+      if(window._hlEmpty < 12){
+        window._hlEmpty++;
+        window._hlRetry = setTimeout(doHL, 800);
+        return;
+      }
+      showNotifBanner('📊 تم التحديث', 'info');
+      return;
+    }
+    window._hlEmpty = 0;
 
     let highlighted = 0;
 
