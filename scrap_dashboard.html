@@ -193,6 +193,7 @@
   #loginGate{
     position:fixed; inset:0; z-index:999;
     background:
+      url('23.jpeg') center/cover no-repeat,
       radial-gradient(1100px 600px at 12% -10%, rgba(45,212,191,0.08), transparent 60%),
       radial-gradient(900px 500px at 100% 0%, rgba(242,169,59,0.07), transparent 55%),
       linear-gradient(180deg, var(--bg-0), var(--bg-1) 40%, var(--bg-1));
@@ -587,9 +588,10 @@ function parseDate(str){
   m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if(m){
     let [, a, b, yr] = m;
-    let mo = parseInt(a), da = parseInt(b);
-    // لو أي رقم أكبر من 12 يبقى هو أكيد اليوم، مش الشهر (بيحل مشكلة صيغ التاريخ المختلفة بين الشيتات)
-    if(mo > 12 && da <= 12){ const t=mo; mo=da; da=t; }
+    let da = parseInt(a), mo = parseInt(b);
+    // صيغة DD/MM/YYYY افتراضية (يوم/شهر/سنة)
+    // لو اليوم أكبر من 31 يبقى هو أكيد الشهر، مش اليوم (صيغة أمريكية MM/DD)
+    if(da > 31 && mo <= 12){ const t=da; da=mo; mo=t; }
     if(yr.length===2) yr = (parseInt(yr)>50 ? '19' : '20') + yr;
     return `${yr}-${pad2(mo)}-${pad2(da)}`;
   }
@@ -1037,20 +1039,20 @@ function generateScrapReport(){
   .print-bar{position:sticky; top:0; background:#fff; padding:10px 0 16px; margin-bottom:14px; border-bottom:2px solid #ddd; display:flex; justify-content:flex-end; gap:10px;}
   .print-bar button{font-family:inherit; font-size:14px; font-weight:700; padding:9px 18px; border-radius:8px; border:none; cursor:pointer; background:#1a3a5c; color:#fff;}
   header{position:relative; text-align:center; margin-bottom:12px;}
-  header .logo{position:absolute; top:0; right:0; width:64px; height:64px; object-fit:contain;}
+  header .logo{position:absolute; top:0.5cm; right:0; height:50px; width:auto; object-fit:contain;}
   header .period{font-size:14px; font-weight:800; color:#1a3a5c; margin-bottom:2px; border-bottom:2px solid #1a3a5c; display:inline-block; padding-bottom:2px;}
   header .title{font-size:15px; font-weight:700; color:#1a3a5c; margin-top:4px;}
-  table{width:100%; border-collapse:collapse; font-size:10px; border:3px double #555;}
-  th, td{border:1px solid #999; padding:3px 5px; text-align:center; color:#111;}
+  table{width:100%; border-collapse:collapse; font-size:12px; border:3px double #555;}
+  th, td{border:1px solid #999; padding:5px 7px; text-align:center; color:#111;}
   td.pe-col, th.pe-col{border-left:3px double #2e8b57;}
   td.pvc-col, th.pvc-col{border-left:3px double #7c3aed;}
   td.total-col, th.total-col{border-left:3px double #dc2626;}
   .defect-cell{text-align:center; font-weight:700;}
-  thead tr.group-row th{background:#1a3a5c; color:#fff; font-size:11px; padding:5px 7px; border-bottom:2px double #fff;}
+  thead tr.group-row th{background:#1a3a5c; color:#fff; font-size:13px; padding:6px 8px; border-bottom:2px double #fff;}
   thead tr.group-row th.pe-head{background:#2e8b57;}
   thead tr.group-row th.pvc-head{background:#7c3aed;}
   thead tr.group-row th.total-head{background:#dc2626;}
-  thead tr.sub-row th{font-size:10px; font-weight:800; color:#111; background:#f0f2f5; border-bottom:2px solid #bbb;}
+  thead tr.sub-row th{font-size:12px; font-weight:800; color:#111; background:#f0f2f5; border-bottom:2px solid #bbb;}
   thead tr.sub-row th.pe-sub{border-bottom-color:#2e8b57;}
   thead tr.sub-row th.pvc-sub{border-bottom-color:#7c3aed;}
   thead tr.sub-row th.total-sub{border-bottom-color:#dc2626;}
@@ -1059,9 +1061,9 @@ function generateScrapReport(){
   tbody tr:nth-child(even){background:#f8f9fb;}
   tbody tr:hover{background:#eef1f6;}
   tfoot td{font-weight:800;}
-  tfoot tr.total-row td{background:#1a3a5c; color:#fff; font-size:11px; border-top:2px double #fff;}
-  tfoot tr.prod-row td{background:#334e77; color:#fff; border-top:1px solid #fff;}
-  tfoot tr.pct-row td{font-weight:900; border-top:3px double #555; background:#f0f2f5; color:#111;}
+  tfoot tr.total-row td{background:#1a3a5c; color:#fff; font-size:13px; border-top:2px double #fff;}
+  tfoot tr.prod-row td{background:#334e77; color:#fff; font-size:12px; border-top:1px solid #fff;}
+  tfoot tr.pct-row td{font-weight:900; font-size:13px; border-top:3px double #555; background:#f0f2f5; color:#111;}
   footer{text-align:center; font-size:11px; color:#888; margin-top:20px;}
   @page{size:A4 landscape; margin:10mm;}
   @media print{
@@ -1069,7 +1071,7 @@ function generateScrapReport(){
     body{padding:10px 14px; padding-top:110px; color:#000;}
     table, .chart-page, canvas{-webkit-print-color-adjust:exact; print-color-adjust:exact;}
     header{position:fixed; top:0; left:0; right:0; z-index:10; background:#fff; padding:8px 10px 6px; text-align:center; border-bottom:2px solid #1a3a5c; margin:0;}
-    header .logo{position:absolute; top:6px; right:8px; width:56px; height:56px;}
+    header .logo{position:absolute; top:0.5cm; right:8px; height:50px; width:auto;}
     header .period{font-size:14px; font-weight:800; color:#1a3a5c; border-bottom:2px solid #1a3a5c;}
     header .title{font-size:14px; font-weight:700; color:#1a3a5c;}
     table{border:3px double #444;}

@@ -1,0 +1,12 @@
+name = "mmp-push-worker"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+# KV namespace — MMP_KV
+[[kv_namespaces]]
+binding = "MMP_KV"
+id = "d5a6e271ba7046038b970e750a22ab0e"
+
+# فحص دوري كل 5 دقائق — بيفعّل الـ scheduled event في worker.js
+[triggers]
+crons = ["*/5 * * * *"]

@@ -1,6 +1,18 @@
 var _swKeepAlive = null;
 var _lastChg = null;
 
+/* ========== خريطة "الرقم المهم" لكل شيت — عشان الإشعار يوري القيمة الفعلية مش بس عدد السجلات ========== */
+var VALUE_FIELD_MAP = {
+  'sw-prod':  { field:'qty_kg',  unit:'كجم', noun:'عملية إنتاج' },
+  'sw-scrap': { field:'weight',  unit:'كجم', noun:'عملية هالك'  },
+  'sw-lab':   { field:null,      unit:'',    noun:'اختبار'      },
+  'sw-raw':   { field:null,      unit:'',    noun:'عينة'        }
+};
+function fmtNum(n){
+  if(n === null || n === undefined || isNaN(n)) return '';
+  return Math.round(n * 10) / 10;
+}
+
 /* ========== فلوتنج بزر الإشعارات ========== */
 (function injectNotifBtn(){
   const div = document.createElement('div');
@@ -12,7 +24,10 @@ var _lastChg = null;
     document.getElementById('mmpNotifBtnInner').onclick = function(){
       if(!('Notification' in window)) return;
       Notification.requestPermission().then(p => {
-        if(p === 'granted') this.textContent = '✅';
+        if(p === 'granted'){
+          this.textContent = '✅';
+          syncPushSub();
+        }
       });
     };
     if('Notification' in window && Notification.permission === 'granted'){
@@ -49,6 +64,7 @@ function requestNotifPermission(){
     if(p === 'granted'){
       const btn = document.getElementById('mmpNotifBtnInner');
       if(btn) btn.textContent = '✅';
+      syncPushSub();
     }
   }).catch(() => {});
 }
@@ -96,16 +112,38 @@ function checkChanges(key, data, title, icon, pageUrl){
   /* بيانات التغيير */
   const diff = data.length - parseInt(prev.split('|')[0]) || 0;
   const lastRow = data[data.length - 1];
+  const cfg = VALUE_FIELD_MAP['sw-' + key] || { field:null, unit:'', noun:'سجل' };
+
   let detail = 'تم تعديل البيانات';
   if(diff > 0){
-    detail = 'تمت إضافة ' + diff + ' سجل';
-    const extra = [];
-    if(lastRow.date) extra.push(lastRow.date);
-    if(lastRow.order_no) extra.push(lastRow.order_no);
-    if(lastRow.product) extra.push(lastRow.product);
-    if(extra.length) detail += '\n' + extra.slice(0,3).join(' | ');
+    /* الصفوف الجديدة (افتراض إن البيانات بتتضاف في الآخر) */
+    const newRows = data.slice(-diff);
+
+    if(cfg.field){
+      const sum = newRows.reduce((s,r) => s + (parseFloat(r[cfg.field]) || 0), 0);
+      detail = 'تمت إضافة ' + diff + ' ' + cfg.noun +
+               (sum ? ' — إجمالي ' + fmtNum(sum) + ' ' + cfg.unit : '');
+      const bits = [];
+      if(lastRow.product_type) bits.push(lastRow.product_type);
+      if(lastRow.machine) bits.push(lastRow.machine);
+      if(lastRow.customer) bits.push(lastRow.customer);
+      if(lastRow.defect_ar) bits.push(lastRow.defect_ar);
+      const lastVal = parseFloat(lastRow[cfg.field]);
+      if(!isNaN(lastVal)) bits.push(fmtNum(lastVal) + ' ' + cfg.unit);
+      if(bits.length) detail += '\nآخر إدخال: ' + bits.slice(0,4).join(' — ');
+    }else{
+      /* شيتات من غير رقم واحد واضح (زي المعملي/الخام) — نوري أهم تفاصيل آخر صف بدل كده */
+      detail = 'تمت إضافة ' + diff + ' ' + cfg.noun;
+      const bits = [];
+      if(lastRow.date) bits.push(lastRow.date);
+      if(lastRow.order_no) bits.push(lastRow.order_no);
+      if(lastRow.product) bits.push(lastRow.product);
+      if(lastRow.grade) bits.push(lastRow.grade);
+      if(lastRow.overall_result) bits.push(String(lastRow.overall_result).toUpperCase());
+      if(bits.length) detail += '\n' + bits.slice(0,3).join(' | ');
+    }
   } else if(diff < 0){
-    detail = 'تم حذف ' + Math.abs(diff) + ' سجل';
+    detail = 'تم حذف ' + Math.abs(diff) + ' ' + cfg.noun;
   }
 
   let lastRowStr = '';
@@ -125,18 +163,42 @@ function checkChanges(key, data, title, icon, pageUrl){
     added: diff,
     lastRow: lastRowStr,
     newIds: newIds.slice(-5),
+    field: cfg.field || null,
+    fieldValues: diff > 0 ? data.slice(-diff).map(r => parseFloat(r[cfg.field])).filter(v => v !== null && !isNaN(v)) : [],
     time: Date.now()
   };
   _lastChg = chgData;
   setTimeout(() => highlightRows(chgData), 800);
 
-  sendToSW('show-notif', {
-    title: title || 'المنيف للأنابيب',
-    body: detail, icon: icon || 'icon-192.png',
-    tag: 'page-' + key + '-' + Date.now(),
-    url: pageUrl || ''
+  /* لو الـ SW عمل إشعار للتغيير ده قبل كده، الصفحة ما تعملش إشعار مكرر */
+  swSeenCount(key).then(swCount => {
+    if(swCount === null || swCount < data.length){
+      sendToSW('show-notif', {
+        title: title || 'المنيف للأنابيب',
+        body: detail, icon: icon || 'icon-192.png',
+        tag: 'page-' + key + '-' + Date.now(),
+        url: pageUrl || ''
+      });
+      showNotifBanner('🔔 ' + detail, 'info');
+    }
   });
-  showNotifBanner('🔔 ' + detail, 'info');
+}
+
+/* عدد الصفوف اللي الـ SW شافها آخر مرة — من الكاش بتاعه */
+function swSeenCount(key){
+  if(!('caches' in window)) return Promise.resolve(null);
+  return caches.keys().then(names => {
+    for(const n of names){
+      if(n.indexOf('mmp-cache-') === 0){
+        return caches.open(n).then(c => c.match('fp-sw-' + key).then(r => r ? r.text() : null));
+      }
+    }
+    return null;
+  }).then(txt => {
+    if(!txt) return null;
+    const p = parseInt(txt.split('|')[0]);
+    return isNaN(p) ? null : p;
+  }).catch(() => null);
 }
 
 /* ========== بصمة البيانات ========== */
@@ -146,9 +208,42 @@ function getDataFingerprint(data){
 }
 
 /* ========== إظهار الصفوف الجديدة (تظليل إنذار) ========== */
+function markCell(el){
+  el.classList.add('highlight-new', 'highlight-settled');
+  clearTimeout(el._settledTimer);
+  el._settledTimer = setTimeout(() => el.classList.remove('highlight-settled'), 20000);
+}
+function markRow(row, chgData){
+  const cells = [...row.querySelectorAll('td')];
+
+  /* 1. دور على الخلية اللي محتواها القيمة الرقمية المتعدلة بالظبط */
+  if(chgData && chgData.fieldValues && chgData.fieldValues.length){
+    for(const cell of cells){
+      const num = parseFloat((cell.textContent || '').replace(/,/g, '').replace(/%/g, ''));
+      if(!isNaN(num) && chgData.fieldValues.some(v => Math.abs(num - v) < 0.01)){
+        markCell(cell);
+        return;
+      }
+    }
+  }
+
+  /* 2. لو مفيش تطابق — اختار أكبر رقم في الصف (الكمية/الوزن غالبًا) */
+  let best = null, bestVal = -1;
+  for(const cell of cells){
+    const txt = (cell.textContent || '').trim();
+    if(!/^[\d.,%]+$/.test(txt)) continue;
+    const num = parseFloat(txt.replace(/,/g, '').replace(/%/g, ''));
+    if(!isNaN(num) && num > bestVal){ best = cell; bestVal = num; }
+  }
+  if(best){ markCell(best); return; }
+
+  /* 3. آخر حل — الصف كله */
+  markCell(row);
+}
 function highlightRows(chgData){
   if(!chgData) return;
   document.querySelectorAll('.highlight-new').forEach(el => el.classList.remove('highlight-new'));
+  document.querySelectorAll('.highlight-settled').forEach(el => el.classList.remove('highlight-settled'));
   if(window._hlRetry){ clearTimeout(window._hlRetry); window._hlRetry = null; }
 
     const doHL = () => {
@@ -178,7 +273,7 @@ function highlightRows(chgData){
           for(const cell of cells){
             const txt = (cell.textContent || '').trim();
             if(txt === p || txt.includes(p) || p.includes(txt)){
-              row.classList.add('highlight-new');
+              markRow(row, chgData);
               highlighted++;
               break;
             }
@@ -198,7 +293,7 @@ function highlightRows(chgData){
           const cells = row.querySelectorAll('td');
           for(const cell of cells){
             if((cell.textContent || '').includes(p)){
-              row.classList.add('highlight-new');
+              markRow(row, chgData);
               highlighted++;
               break;
             }
@@ -213,13 +308,14 @@ function highlightRows(chgData){
     if(!highlighted){
       const n = Math.max(1, chgData.added > 0 ? chgData.added : 3);
       for(let i = 0; i < Math.min(n, rows.length); i++){
-        rows[i].classList.add('highlight-new');
+        markRow(rows[i], chgData);
         highlighted++;
       }
     }
 
-    table.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    if(highlighted) showNotifBanner('🚨 تم إظهار ' + highlighted + ' صف', 'info');
+    if(highlighted){
+      showNotifBanner('🚨 تم إظهار ' + highlighted + ' صف', 'info');
+    }
   };
 
   doHL();
@@ -241,6 +337,24 @@ function sendToSW(type, payload){
   if(!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.ready.then(reg => {
     if(reg.active) reg.active.postMessage({ type: type, ...payload });
+  }).catch(() => {});
+}
+
+/* إرسال اشتراك الـ push للسيرفر — بيتستدعى لما الإذن يتفعّل */
+function syncPushSub(){
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  const workerUrl = (typeof PUSH_WORKER_URL === 'string') ? PUSH_WORKER_URL : null;
+  if(!workerUrl) return;
+  navigator.serviceWorker.ready.then(reg => {
+    if(!reg.pushManager) return;
+    reg.pushManager.getSubscription().then(sub => {
+      if(!sub) return;
+      fetch(workerUrl + '/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: sub.endpoint, keys: (sub.toJSON().keys || null) })
+      }).catch(() => {});
+    }).catch(() => {});
   }).catch(() => {});
 }
 
@@ -269,7 +383,49 @@ function resetApp(){
       37% { background: rgba(155,140,242,0.5) !important; box-shadow: 0 0 25px rgba(155,140,242,0.6), inset 0 0 0 2px #9b8cf2 !important; }
       50% { background: rgba(242,103,139,0.5) !important; box-shadow: 0 0 25px rgba(242,103,139,0.6), inset 0 0 0 2px #f2678b !important; }
     }
-    .highlight-new { animation: alarmBlink 1.2s ease-in-out 3 !important; border-radius: 4px; }
+    .highlight-new { animation: alarmBlink 1.2s ease-in-out 3 !important; border-radius: 4px; position: relative; }
+    /* هالة على الخلية الرقمية (الرقم اللي زاد) */
+    td.highlight-new { border-radius: 6px; display: table-cell; }
+    td.highlight-settled {
+      box-shadow: 0 0 0 2px rgba(45,212,191,0.55), 0 0 12px rgba(45,212,191,0.45) !important;
+      background: rgba(45,212,191,0.14) !important;
+      border-radius: 6px !important;
+      font-weight: 800 !important;
+    }
+    /* دائرة حمراء على الخلية الرقمية المتعدلة */
+    td.highlight-settled { position: relative !important; }
+    td.highlight-settled::after {
+      content: '●';
+      position: absolute; top: 2px; left: 2px;
+      color: #f2678b; font-size: 11px; line-height: 1;
+      text-shadow: 0 0 6px rgba(242,103,139,0.9);
+      animation: redDot 1s ease-in-out infinite;
+    }
+    @keyframes redDot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: .7; }
+    }
+    /* الصف كامل (حالة احتياطية) */
+    tr.highlight-settled {
+      box-shadow: inset 3px 0 0 0 #2dd4bf !important;
+      background: rgba(45,212,191,0.08) !important;
+      position: relative;
+    }
+    tr.highlight-settled td:first-child{ position: relative; }
+    tr.highlight-settled td:first-child::before {
+      content: 'جديد';
+      position: absolute; top: 2px; right: 2px;
+      background: #2dd4bf; color: #04211d;
+      font-size: 9px; font-weight: 800; padding: 1px 5px; border-radius: 8px;
+      line-height: 1.4; z-index: 2;
+    }
+    tr.highlight-settled td:first-child::after {
+      content: '●';
+      position: absolute; top: 2px; left: 2px;
+      color: #f2678b; font-size: 11px; line-height: 1;
+      text-shadow: 0 0 6px rgba(242,103,139,0.9);
+      animation: redDot 1s ease-in-out infinite;
+    }
     #mmpNotifBtnInner:hover { transform:scale(1.1); }
     #mmpNotifBtnInner:active { transform:scale(0.95); }
   `;
