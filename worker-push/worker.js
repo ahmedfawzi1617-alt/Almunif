@@ -109,8 +109,8 @@ async function encryptPayload(subscription, payload){
   const encKey = await crypto.subtle.importKey('raw', cek, { name: 'AES-GCM' }, false, ['encrypt']);
   const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: nonce }, encKey, ENC.encode(payload)));
 
-  /* 6) بناء الهيدر: version(1) + salt(16) + rs(4) + idlen(1) + server_pub(65) */
-  const head = new Uint8Array(86);
+  /* 6) بناء الهيدر: version(1) + salt(16) + rs(4) + idlen(1) + server_pub(65) = 87 */
+  const head = new Uint8Array(87);
   head[0] = 0;                                     /* version */
   head.set(salt, 1);                               /* salt 16 */
   new DataView(head.buffer).setUint32(17, 4096);   /* rs = 4096 */
@@ -133,7 +133,7 @@ async function sendPush(kv, subscription, title, body, url){
     headers: {
       'Content-Type': 'application/octet-stream',
       'TTL': '86400',
-      'Authorization': 'vapid t=' + auth,
+      'Authorization': 'vapid t=' + auth + '; k=' + VAPID_PUBLIC_KEY,
       'Content-Encoding': 'aes128gcm'
     },
     body: bodyEnc
@@ -234,6 +234,27 @@ export default {
     if(request.method === 'GET' && url.pathname === '/health'){
       const subs = await getSubs(kv);
       return new Response(JSON.stringify({ ok: true, subs: subs.length }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
+    /* إشعار تجريبي لكل الأجهزة المشتركة — للفحص فقط */
+    if(request.method === 'GET' && url.pathname === '/testpush'){
+      const subs = await getSubs(kv);
+      const results = await Promise.allSettled(
+        subs.map(s => sendPush(kv, s, 'المنيف للأنابيب', '✅ إشعار تجريبي — اختبار الإشعارات يعمل', 'OVERVIEW.html'))
+      );
+      const summary = [];
+      for(let i = 0; i < results.length; i++){
+        const r = results[i];
+        if(r.status === 'fulfilled'){
+          let body = '';
+          let headers = {};
+          try{ body = await r.value.text(); headers = Object.fromEntries(r.value.headers.entries()); }catch(_){}
+          summary.push({ device: i + 1, ok: true, code: r.value.status, body, headers });
+        }else{
+          summary.push({ device: i + 1, ok: false, err: String(r.reason) });
+        }
+      }
+      return new Response(JSON.stringify({ total: subs.length, results: summary }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
     if(url.pathname === '/check'){
